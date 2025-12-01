@@ -73,9 +73,8 @@ def launch_ui():
             "streamlit",
             "run",
             app_path,
-            "--server.headless=true",
-            "--browser.gatherUsageStats=false",
-            "--server.port=8501"
+            "--server.headless=false",
+            "--browser.gatherUsageStats=false"
         ]
 
         # Run Streamlit
