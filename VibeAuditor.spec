@@ -24,6 +24,7 @@ a = Analysis(
     datas=[
         ('src', 'src'),  # Include source code
         ('docs', 'docs'),  # Include documentation
+        ('.streamlit', '.streamlit'),  # Include Streamlit config
     ] + streamlit_datas + streamlit_metadata + altair_metadata + plotly_metadata,
     hiddenimports=all_hidden_imports,
     hookspath=[],
