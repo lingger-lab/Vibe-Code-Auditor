@@ -1,0 +1,42 @@
+# Vibe-Code Auditor Configuration File
+# Test configuration
+
+# Analysis settings
+analysis:
+  mode: personal  # Changed to personal mode
+  skip_ai: true   # Skip AI for testing
+  languages: []
+
+# Tool configuration
+tools:
+  pylint:
+    enabled: true
+    timeout: 300
+
+  semgrep:
+    enabled: false  # Disabled for Windows
+
+  jscpd:
+    enabled: true
+    timeout: 180
+
+  eslint:
+    enabled: true
+
+# Output settings
+output:
+  format: json       # Output as JSON by default
+  path: auto-report.json  # Auto-generate report
+  verbose: false
+  quiet: false
+
+# Exclude patterns
+exclude:
+  dirs:
+    - node_modules
+    - venv
+    - __pycache__
+    - .git
+  files:
+    - "*.min.js"
+    - "*.pyc"

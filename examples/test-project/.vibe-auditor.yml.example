@@ -1,0 +1,50 @@
+# Vibe-Code Auditor Configuration File
+# Place this file as .vibe-auditor.yml in your project root
+
+# Analysis settings
+analysis:
+  mode: deployment  # deployment or personal
+  skip_ai: false    # Skip AI analysis (static only)
+  languages: []     # Auto-detect if empty, or specify: [python, javascript, typescript]
+
+# Tool configuration
+tools:
+  pylint:
+    enabled: true
+    timeout: 300  # seconds
+
+  semgrep:
+    enabled: true
+    timeout: 300
+
+  jscpd:
+    enabled: true
+    timeout: 180
+
+  eslint:
+    enabled: true
+
+# Output settings
+output:
+  format: cli       # cli, json, or html
+  path: null        # Output file path (e.g., report.json)
+  verbose: false    # Enable verbose logging
+  quiet: false      # Enable quiet mode (errors only)
+
+# Exclude patterns
+exclude:
+  dirs:
+    - node_modules
+    - venv
+    - env
+    - .venv
+    - __pycache__
+    - .git
+    - dist
+    - build
+    - .idea
+    - .vscode
+  files:
+    - "*.min.js"
+    - "*.bundle.js"
+    - "*.pyc"

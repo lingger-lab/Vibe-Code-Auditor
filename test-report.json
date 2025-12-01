@@ -1,0 +1,87 @@
+{
+  "metadata": {
+    "tool": "Vibe-Code Auditor",
+    "version": "1.1.0",
+    "timestamp": "2025-12-01T09:17:48.088347",
+    "project_path": "examples\\test-project",
+    "analysis_mode": "deployment"
+  },
+  "summary": {
+    "total_issues": 6,
+    "static_issues": 6,
+    "ai_issues": 0,
+    "by_severity": {
+      "critical": 0,
+      "warning": 1,
+      "info": 5
+    }
+  },
+  "static_analysis": {
+    "mode": "deployment",
+    "languages": [
+      "python"
+    ],
+    "issues": [
+      {
+        "tool": "pylint",
+        "file": "examples\\test-project\\sample.py",
+        "line": 3,
+        "severity": "info",
+        "message": "Missing function or method docstring",
+        "symbol": "missing-function-docstring",
+        "message_id": "C0116"
+      },
+      {
+        "tool": "pylint",
+        "file": "examples\\test-project\\sample.py",
+        "line": 11,
+        "severity": "warning",
+        "message": "Unnecessary pass statement",
+        "symbol": "unnecessary-pass",
+        "message_id": "W0107"
+      },
+      {
+        "tool": "pylint",
+        "file": "examples\\test-project\\sample.py",
+        "line": 13,
+        "severity": "info",
+        "message": "Missing class docstring",
+        "symbol": "missing-class-docstring",
+        "message_id": "C0115"
+      },
+      {
+        "tool": "pylint",
+        "file": "examples\\test-project\\sample.py",
+        "line": 17,
+        "severity": "info",
+        "message": "Missing function or method docstring",
+        "symbol": "missing-function-docstring",
+        "message_id": "C0116"
+      },
+      {
+        "tool": "pylint",
+        "file": "examples\\test-project\\sample.py",
+        "line": 13,
+        "severity": "info",
+        "message": "Too few public methods (1/2)",
+        "symbol": "too-few-public-methods",
+        "message_id": "R0903"
+      },
+      {
+        "tool": "semgrep",
+        "severity": "info",
+        "message": "Semgrep is not available on Windows. For security scanning, use WSL or Linux.",
+        "suggestion": "Install WSL: https://aka.ms/wsl or use Linux/macOS"
+      }
+    ],
+    "summary": {
+      "total_issues": 6,
+      "by_severity": {
+        "critical": 0,
+        "warning": 1,
+        "info": 5
+      }
+    }
+  },
+  "ai_analysis": null
+}

@@ -1,0 +1,86 @@
+[
+  {
+    "timestamp": "2025-12-01T09:26:32.145520",
+    "mode": "deployment",
+    "summary": {
+      "total_issues": 6,
+      "static_issues": 6,
+      "ai_issues": 0,
+      "by_severity": {
+        "critical": 0,
+        "warning": 1,
+        "info": 5
+      }
+    }
+  },
+  {
+    "timestamp": "2025-12-01T09:26:47.063515",
+    "mode": "personal",
+    "summary": {
+      "total_issues": 6,
+      "static_issues": 6,
+      "ai_issues": 0,
+      "by_severity": {
+        "critical": 0,
+        "warning": 1,
+        "info": 5
+      }
+    }
+  },
+  {
+    "timestamp": "2025-12-01T09:37:43.410426",
+    "mode": "deployment",
+    "summary": {
+      "total_issues": 6,
+      "static_issues": 6,
+      "ai_issues": 0,
+      "by_severity": {
+        "critical": 0,
+        "warning": 1,
+        "info": 5
+      }
+    }
+  },
+  {
+    "timestamp": "2025-12-01T09:38:03.909511",
+    "mode": "deployment",
+    "summary": {
+      "total_issues": 6,
+      "static_issues": 6,
+      "ai_issues": 0,
+      "by_severity": {
+        "critical": 0,
+        "warning": 1,
+        "info": 5
+      }
+    }
+  },
+  {
+    "timestamp": "2025-12-01T09:38:35.838799",
+    "mode": "personal",
+    "summary": {
+      "total_issues": 6,
+      "static_issues": 6,
+      "ai_issues": 0,
+      "by_severity": {
+        "critical": 0,
+        "warning": 1,
+        "info": 5
+      }
+    }
+  },
+  {
+    "timestamp": "2025-12-01T09:38:53.230200",
+    "mode": "deployment",
+    "summary": {
+      "total_issues": 6,
+      "static_issues": 6,
+      "ai_issues": 0,
+      "by_severity": {
+        "critical": 0,
+        "warning": 1,
+        "info": 5
+      }
+    }
+  }
+]

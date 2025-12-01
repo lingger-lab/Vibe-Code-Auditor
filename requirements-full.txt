@@ -1,0 +1,7 @@
+# 전체 패키지 (Linux/macOS/WSL 환경)
+click==8.1.7
+anthropic==0.45.0
+rich==13.9.4
+python-dotenv==1.0.1
+pylint==3.3.2
+semgrep==1.100.0
