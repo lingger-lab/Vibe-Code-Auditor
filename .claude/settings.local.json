@@ -12,7 +12,9 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\nRelease v1.5.0: Multi-language support expansion\n\n- Added support for 11 programming languages (up from 3)\n- Integrated 15+ static analysis tools\n- Implemented 8 new language-specific analyzers\n- Fixed all test issues (99/99 tests passing)\n- Extended file extensions and exclude directories\n\nLanguages added: Go, Rust, PHP, Ruby, Kotlin, Swift, C#, Java\nAnalyzers: staticcheck, clippy, PHPStan, RuboCop, ktlint, SwiftLint, Roslyn\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(del nul)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nRelease v1.6.0: Core engine refactoring for multi-interface support\n\nPhase 1 완료: 코어 엔진 아키텍처 개선\n\nAdded:\n- src/core/analyzer_engine.py - Unified analysis engine\n- src/core/__init__.py - Core module initialization\n- AnalyzerEngine class with progress callback support\n- AnalysisProgress class for real-time tracking\n- docs/PHASE_1_COMPLETE.md - Comprehensive completion report\n\nChanged:\n- Refactored src/cli/main.py to use AnalyzerEngine\n- Simplified CLI dependencies (removed 6 imports)\n- Updated PROJECT_STRUCTURE.md with v1.6.0 architecture\n- Updated CHANGELOG.md with v1.6.0 changes\n\nTechnical:\n- Separation of concerns: Core vs Interface layer\n- Facade pattern for unified analysis pipeline\n- Observer pattern for progress callbacks\n- Preparation for Streamlit UI integration (Phase 2)\n\nQuality:\n- All tests passing: 99/99 (100%)\n- Code coverage: 66% overall, 80% core engine\n- Zero breaking changes to CLI API\n- Backward compatible with v1.5.0\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []

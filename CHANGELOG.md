@@ -5,6 +5,74 @@ All notable changes to Vibe-Code Auditor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2025-12-01
+
+### Added
+- **Core Analyzer Engine** (`src/core/analyzer_engine.py`)
+  - Unified analysis engine for CLI and future UI interfaces
+  - `AnalyzerEngine` class with complete analysis pipeline
+  - `AnalysisProgress` class for real-time progress tracking
+  - Progress callback system for UI updates
+  - Centralized requirement validation
+  - Integrated history and cache management
+
+- **Progress Tracking**
+  - Real-time progress updates (0-100%)
+  - Stage-based progress reporting (validation, detection, static_analysis, ai_analysis, finalization)
+  - Error reporting through progress system
+  - Customizable progress callbacks for different UIs
+
+### Changed
+- **CLI Refactoring** (`src/cli/main.py`)
+  - Migrated from direct component usage to `AnalyzerEngine`
+  - Implemented progress callback for CLI output
+  - Reduced direct dependencies (removed 6 imports)
+  - Simplified main analysis workflow (~80 lines → ~60 lines)
+  - Improved error handling through centralized engine
+
+- **Architecture**
+  - Separation of concerns: Core engine vs Interface layer
+  - Preparation for multi-interface support (CLI + UI)
+  - Improved code reusability and testability
+
+### Technical
+- **New Module**: `src/core/` with 2 files (~300 LOC)
+- **Refactored**: `src/cli/main.py` (removed ~80 lines, added ~100 lines)
+- **Dependency Graph**: Simplified CLI dependencies through engine abstraction
+- **Design Patterns**:
+  - Facade pattern (AnalyzerEngine)
+  - Observer pattern (Progress callbacks)
+  - Strategy pattern (Analysis modes)
+
+### Quality
+- All existing tests passing: 99/99 (100%)
+- Code coverage: 66% overall, 80% for core engine
+- Zero breaking changes to public CLI API
+- Backward compatible with v1.5.0
+
+### Documentation
+- Added `docs/PHASE_1_COMPLETE.md` - Comprehensive Phase 1 completion report
+- Updated `PROJECT_STRUCTURE.md` - New architecture and data flow
+- Updated `CHANGELOG.md` - This entry
+
+### Benefits
+- **Code Reusability**: CLI and future UI share the same analysis logic
+- **Maintainability**: Centralized analysis pipeline
+- **Extensibility**: Easy to add new interfaces (UI, API, etc.)
+- **Testability**: Engine can be tested independently of interfaces
+- **Progress Visibility**: Real-time feedback for long-running analyses
+
+### Migration Path
+No migration required - all existing CLI commands work identically.
+
+```python
+# Internal change (invisible to users):
+# Before: CLI directly calls analyzers
+# After: CLI uses AnalyzerEngine which calls analyzers
+```
+
+---
+
 ## [1.5.0] - 2025-12-01
 
 ### Added

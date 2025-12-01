@@ -17,19 +17,26 @@ Vibe-Code Auditor/
 ├── 📂 docs/                        # 설계 문서
 │   ├── PRD.md                      # 요구사항 정의서
 │   ├── TRD.md                      # 기술 사양서
-│   └── Tasks.md                    # AI 코딩 착수 프롬프트
+│   ├── Tasks.md                    # AI 코딩 착수 프롬프트
+│   ├── PHASE_1_COMPLETE.md         # Phase 1 완료 문서 (v1.6.0)
+│   ├── PHASE_2.1_COMPLETE.md       # Phase 2.1 완료 문서 (v1.5.0)
+│   └── IMPROVEMENT_ROADMAP.md      # 개선 로드맵
 │
 ├── 📂 src/                         # 소스 코드
 │   ├── __init__.py
 │   │
-│   ├── 📂 cli/                     # CLI 진입점
+│   ├── 📂 core/                    # 코어 엔진 (v1.6.0 추가)
+│   │   ├── __init__.py
+│   │   └── analyzer_engine.py      # 통합 분석 엔진
+│   │
+│   ├── 📂 cli/                     # CLI 인터페이스
 │   │   ├── __init__.py
 │   │   └── main.py                 # Click 기반 메인 CLI
 │   │
 │   ├── 📂 analyzers/               # 분석 엔진
 │   │   ├── __init__.py
-│   │   ├── ai_analyzer.py          # Claude Code API 연동
-│   │   └── static_analyzer.py      # 정적 분석 도구 실행
+│   │   ├── ai_analyzer.py          # Claude API 연동
+│   │   └── static_analyzer.py      # 11개 언어 정적 분석 도구
 │   │
 │   ├── 📂 detectors/               # 언어 감지
 │   │   ├── __init__.py
@@ -37,55 +44,88 @@ Vibe-Code Auditor/
 │   │
 │   ├── 📂 reporters/               # 리포트 생성
 │   │   ├── __init__.py
-│   │   └── cli_reporter.py         # Rich 기반 터미널 출력
+│   │   ├── cli_reporter.py         # Rich 기반 터미널 출력
+│   │   ├── json_reporter.py        # JSON 형식 출력
+│   │   └── html_reporter.py        # HTML 형식 출력
+│   │
+│   ├── 📂 utils/                   # 유틸리티
+│   │   ├── __init__.py
+│   │   ├── cache_manager.py        # 결과 캐싱
+│   │   ├── history_tracker.py      # 히스토리 추적
+│   │   └── logger.py               # 로깅 설정
 │   │
 │   └── 📂 config/                  # 설정
 │       ├── __init__.py
-│       └── settings.py             # 전역 설정 및 상수
+│       ├── settings.py             # 전역 설정 및 상수
+│       └── config_loader.py        # YAML 설정 로더
 │
-├── 📂 tests/                       # 테스트
+├── 📂 tests/                       # 테스트 (99개 테스트)
 │   ├── __init__.py
+│   ├── test_ai_analyzer.py         # AI 분석 테스트
+│   ├── test_cache_manager.py       # 캐시 테스트
+│   ├── test_cli.py                 # CLI 테스트
+│   ├── test_config_loader.py       # 설정 로더 테스트
+│   ├── test_history_tracker.py     # 히스토리 테스트
+│   ├── test_integration.py         # 통합 테스트
 │   └── test_language_detector.py   # 언어 감지 테스트
 │
 └── 📂 examples/                    # 예제 프로젝트
     ├── README.md
-    └── sample-project/
-        └── app.py                  # 테스트용 샘플 코드
+    ├── sample-project/
+    │   └── app.py                  # 테스트용 샘플 코드
+    └── test-project/
+        ├── sample.py
+        └── .vibe-auditor.yml       # 설정 파일 예제
 ```
 
 ## 🔧 주요 모듈 설명
 
-### 1. CLI 모듈 (`src/cli/`)
+### 1. Core 모듈 (`src/core/`) - v1.6.0 추가
+
+**analyzer_engine.py**
+- 통합 분석 엔진 (CLI/UI 공유)
+- 분석 파이프라인 오케스트레이션
+- Progress callback 지원
+- 요구사항 검증 및 에러 처리
+- 히스토리/캐시 관리
+
+**주요 클래스:**
+- `AnalyzerEngine`: 통합 분석 엔진
+- `AnalysisProgress`: 진행 상황 추적
+
+### 2. CLI 모듈 (`src/cli/`)
 
 **main.py**
 - Click 기반 CLI 진입점
 - 사용자 입력 처리 (경로, 모드, 옵션)
-- 분석 워크플로우 오케스트레이션
-- 에러 핸들링 및 사용자 피드백
+- AnalyzerEngine 활용
+- Progress callback 구현
+- Rich 기반 실시간 진행 상황 표시
 
-### 2. Analyzers 모듈 (`src/analyzers/`)
+### 3. Analyzers 모듈 (`src/analyzers/`)
 
 **ai_analyzer.py**
-- Claude Code API 호출
-- 코드 샘플 수집 및 전처리
+- Claude API 호출
+- 코드 샘플 수집 및 전처리 (11개 언어)
 - AI 프롬프트 생성
 - AI 응답 파싱 및 구조화
 
 **static_analyzer.py**
-- 정적 분석 도구 실행 (Pylint, Semgrep, jscpd)
+- 15+ 정적 분석 도구 실행
+- 11개 언어 지원 (Python, JS, TS, Go, Rust, PHP, Ruby, Kotlin, Swift, C#, Java)
 - 도구 설치 여부 확인
 - 분석 결과 통합 및 정규화
 - 심각도 매핑
 
-### 3. Detectors 모듈 (`src/detectors/`)
+### 4. Detectors 모듈 (`src/detectors/`)
 
 **language_detector.py**
-- 파일 확장자 기반 언어 감지
-- 특수 파일 감지 (package.json, requirements.txt 등)
+- 파일 확장자 기반 언어 감지 (11개 언어)
+- 특수 파일 감지 (package.json, requirements.txt, go.mod, Cargo.toml 등)
 - 제외 패턴 필터링
 - 프로젝트 요약 생성
 
-### 4. Reporters 모듈 (`src/reporters/`)
+### 5. Reporters 모듈 (`src/reporters/`)
 
 **cli_reporter.py**
 - Rich 라이브러리 기반 포맷팅
@@ -93,44 +133,93 @@ Vibe-Code Auditor/
 - 요약 테이블 생성
 - 관점별 우선순위 정렬
 
-### 5. Config 모듈 (`src/config/`)
+**json_reporter.py**
+- JSON 형식 리포트 생성
+- 구조화된 데이터 출력
+
+**html_reporter.py**
+- HTML 형식 리포트 생성
+- 인터랙티브 웹 리포트
+
+### 6. Utils 모듈 (`src/utils/`)
+
+**cache_manager.py**
+- 해시 기반 결과 캐싱
+- TTL 기반 캐시 만료
+- 99% 속도 향상
+
+**history_tracker.py**
+- 분석 결과 히스토리 추적
+- 트렌드 분석 (개선/악화/안정)
+- 시계열 데이터 관리
+
+**logger.py**
+- 로깅 설정 및 관리
+- 파일/콘솔 로그 출력
+
+### 7. Config 모듈 (`src/config/`)
 
 **settings.py**
 - 환경변수 로드 (.env)
 - 분석 모드 설정 (deployment, personal)
-- 언어 패턴 정의
-- 정적 분석 도구 설정
+- 11개 언어 패턴 정의
+- 15+ 정적 분석 도구 설정
 - 심각도 레벨 정의
 
-## 🔄 데이터 흐름
+**config_loader.py**
+- YAML 설정 파일 로드
+- 기본 설정 병합
+- 설정 검증
+
+## 🔄 데이터 흐름 (v1.6.0)
 
 ```
 1. 사용자 입력
    └─> CLI (main.py)
+       └─> AnalyzerEngine 생성 (progress_callback 등록)
 
-2. 언어 감지
-   └─> LanguageDetector
-       └─> 감지된 언어 목록
+2. AnalyzerEngine.analyze()
+   │
+   ├─> 1단계: validate_requirements()
+   │   ├─> 프로젝트 경로 확인
+   │   └─> API 키 확인 (AI 분석 시)
+   │
+   ├─> 2단계: LanguageDetector.detect()
+   │   └─> 11개 언어 감지
+   │       └─> Progress callback (20%)
+   │
+   ├─> 3단계: StaticAnalyzer.analyze()
+   │   ├─> Pylint, Ruff (Python)
+   │   ├─> ESLint, TSLint (JavaScript/TypeScript)
+   │   ├─> staticcheck, golangci-lint (Go)
+   │   ├─> clippy, cargo-audit (Rust)
+   │   ├─> PHPStan, Psalm (PHP)
+   │   ├─> RuboCop (Ruby)
+   │   ├─> ktlint (Kotlin)
+   │   ├─> SwiftLint (Swift)
+   │   ├─> Roslyn (C#)
+   │   ├─> Semgrep (보안)
+   │   └─> jscpd (중복)
+   │       └─> Progress callback (60%)
+   │
+   ├─> 4단계: AIAnalyzer.analyze() (선택적)
+   │   ├─> 코드 샘플 수집 (11개 언어)
+   │   ├─> Claude API 호출
+   │   └─> AI 분석 결과
+   │       └─> Progress callback (90%)
+   │
+   ├─> 5단계: HistoryTracker.save_result() (선택적)
+   │   └─> 분석 결과 저장
+   │       └─> Progress callback (95%)
+   │
+   └─> 6단계: 결과 반환
+       └─> Progress callback (100%)
 
-3. 정적 분석
-   └─> StaticAnalyzer
-       ├─> Pylint (Python)
-       ├─> ESLint (JavaScript/TypeScript)
-       ├─> Semgrep (보안)
-       └─> jscpd (중복)
-       └─> 정적 분석 결과
-
-4. AI 분석 (선택적)
-   └─> AIAnalyzer
-       ├─> 코드 샘플 수집
-       ├─> Claude API 호출
-       └─> AI 분석 결과
-
-5. 리포트 생성
-   └─> CLIReporter
+3. 리포트 생성
+   └─> CLIReporter / JSONReporter / HTMLReporter
        ├─> 결과 통합
        ├─> 관점별 필터링
-       └─> 터미널 출력
+       └─> 출력
 ```
 
 ## 🎨 설계 패턴
@@ -150,16 +239,22 @@ Vibe-Code Auditor/
 - AI 프롬프트를 단계별로 구성
 - 리포트를 섹션별로 구성
 
-## 📊 의존성 그래프
+## 📊 의존성 그래프 (v1.6.0)
 
 ```
 main.py
-├─> language_detector.py
-├─> static_analyzer.py
-│   └─> settings.py
-├─> ai_analyzer.py
-│   └─> settings.py
-└─> cli_reporter.py
+└─> analyzer_engine.py (코어 엔진)
+    ├─> language_detector.py
+    │   └─> settings.py
+    ├─> static_analyzer.py
+    │   └─> settings.py
+    ├─> ai_analyzer.py
+    │   └─> settings.py
+    ├─> history_tracker.py
+    └─> cache_manager.py
+
+main.py
+└─> cli_reporter.py / json_reporter.py / html_reporter.py
     └─> settings.py
 ```
 
@@ -224,4 +319,30 @@ main.py
 
 ### 버전 관리
 - Semantic Versioning (MAJOR.MINOR.PATCH)
-- 현재 버전: 1.0.0
+- 현재 버전: 1.6.0
+- v1.5.0: 11개 언어 지원, 15+ 정적 분석 도구
+- v1.6.0: 코어 엔진 리팩토링, 멀티 인터페이스 지원 준비
+
+## 🚀 Phase 1 완료 (v1.6.0)
+
+### 주요 성과
+- ✅ 코어 엔진 분리 (`src/core/analyzer_engine.py`)
+- ✅ CLI 리팩토링 (AnalyzerEngine 사용)
+- ✅ Progress callback 시스템 구현
+- ✅ 모든 테스트 통과 (99/99)
+- ✅ 하위 호환성 유지
+
+### 아키텍처 개선
+```
+기존 (v1.5.0):          새로운 (v1.6.0):
+CLI (단일)              CLI + (향후) UI
+  ↓                       ↓        ↓
+분석 로직               AnalyzerEngine (공유)
+                           ↓
+                      분석 로직
+```
+
+### 다음 단계: Phase 2
+- Streamlit UI 구현
+- UI 전용 리포터
+- PyInstaller 패키징

@@ -8,17 +8,13 @@ from rich.console import Console
 
 from typing import Optional
 
-from src.config.settings import ANALYSIS_MODES, ANTHROPIC_API_KEY
+from src.config.settings import ANALYSIS_MODES
 from src.config.config_loader import ConfigLoader
-from src.detectors.language_detector import LanguageDetector
-from src.analyzers.static_analyzer import StaticAnalyzer
-from src.analyzers.ai_analyzer import AIAnalyzer
+from src.core.analyzer_engine import AnalyzerEngine, AnalysisProgress
 from src.reporters.cli_reporter import CLIReporter
 from src.reporters.json_reporter import JSONReporter
 from src.reporters.html_reporter import HTMLReporter
 from src.utils.logger import setup_logger
-from src.utils.history_tracker import HistoryTracker
-from src.utils.cache_manager import CacheManager
 
 console = Console()
 logger = setup_logger(__name__)
@@ -114,8 +110,8 @@ def audit(path: Path, mode: Optional[str], skip_ai: bool, verbose: bool, quiet: 
 
     # Handle --show-history flag
     if show_history:
-        history_tracker = HistoryTracker(path)
-        trend_data = history_tracker.get_trend_data()
+        engine = AnalyzerEngine(path)
+        trend_data = engine.get_trend_data()
 
         if trend_data['total_runs'] == 0:
             console.print("[yellow]아직 분석 히스토리가 없습니다.[/yellow]\n")
@@ -148,8 +144,8 @@ def audit(path: Path, mode: Optional[str], skip_ai: bool, verbose: bool, quiet: 
 
     # Handle --clear-cache flag
     if clear_cache:
-        cache_mgr = CacheManager(path)
-        cache_mgr.invalidate()
+        engine = AnalyzerEngine(path)
+        engine.clear_cache()
         console.print("[green]✓ 캐시 데이터가 삭제되었습니다.[/green]\n")
         return
 
@@ -214,49 +210,67 @@ def audit(path: Path, mode: Optional[str], skip_ai: bool, verbose: bool, quiet: 
 
     logger.debug(f"Final configuration: mode={mode}, skip_ai={skip_ai}, output={output}, format={format}")
 
-    # Validate API key if AI analysis is requested
-    if not skip_ai and not ANTHROPIC_API_KEY:
-        console.print("[bold red]❌ 오류: ANTHROPIC_API_KEY가 설정되지 않았습니다.[/bold red]")
-        console.print("\n다음 단계를 따라주세요:")
-        console.print("1. 프로젝트 루트에 .env 파일을 생성하세요")
-        console.print("2. .env.example 파일을 참고하여 API 키를 설정하세요")
-        console.print("   ANTHROPIC_API_KEY=your_api_key_here")
-        console.print("\n또는 --skip-ai 플래그를 사용하여 정적 분석만 수행할 수 있습니다.\n")
-        sys.exit(1)
-
     # Display analysis info
     mode_info = ANALYSIS_MODES[mode]
     console.print(f"[bold]📁 분석 경로:[/bold] {path}")
     console.print(f"[bold]🎯 분석 관점:[/bold] {mode_info['name']}")
     console.print(f"[bold]📊 우선순위:[/bold] {', '.join(mode_info['priorities'])}\n")
 
-    # Step 1: Detect languages
+    # Create progress callback for CLI
+    def progress_callback(progress: AnalysisProgress):
+        """Handle progress updates from the analyzer engine."""
+        if progress.stage == "detection" and progress.percentage == 20:
+            console.print(f"[green]✓ 감지된 언어:[/green] {', '.join(progress.languages)}\n")
+        elif progress.stage == "static_analysis" and progress.percentage == 60:
+            console.print(f"[green]✓ 정적 분석 완료[/green]\n")
+        elif progress.stage == "ai_analysis":
+            if progress.percentage == 90 and not skip_ai:
+                console.print(f"[green]✓ AI 분석 완료[/green]\n")
+        elif progress.error:
+            if "ANTHROPIC_API_KEY" in progress.error:
+                console.print("[bold red]❌ 오류: ANTHROPIC_API_KEY가 설정되지 않았습니다.[/bold red]")
+                console.print("\n다음 단계를 따라주세요:")
+                console.print("1. 프로젝트 루트에 .env 파일을 생성하세요")
+                console.print("2. .env.example 파일을 참고하여 API 키를 설정하세요")
+                console.print("   ANTHROPIC_API_KEY=your_api_key_here")
+                console.print("\n또는 --skip-ai 플래그를 사용하여 정적 분석만 수행할 수 있습니다.\n")
+            elif "No analyzable code files" in progress.error:
+                console.print("[bold red]❌ 분석 가능한 코드 파일을 찾을 수 없습니다.[/bold red]\n")
+            else:
+                console.print(f"[bold red]❌ 오류:[/bold red] {progress.error}\n")
+
+    # Display progress steps
     console.print("[bold yellow]1️⃣ 프로젝트 언어 감지 중...[/bold yellow]")
-    detector = LanguageDetector(path)
-    languages = detector.detect()
 
-    if not languages:
-        console.print("[bold red]❌ 분석 가능한 코드 파일을 찾을 수 없습니다.[/bold red]\n")
-        sys.exit(1)
-
-    console.print(f"[green]✓ 감지된 언어:[/green] {', '.join(languages)}\n")
-
-    # Step 2: Run static analysis
-    console.print("[bold yellow]2️⃣ 정적 분석 실행 중...[/bold yellow]")
+    # Create and run analyzer engine
     use_cache = not no_cache
-    static_analyzer = StaticAnalyzer(path, languages, mode, use_cache=use_cache)
-    static_results = static_analyzer.analyze()
-    console.print(f"[green]✓ 정적 분석 완료[/green]\n")
+    save_history = not no_history
 
-    # Step 3: Run AI analysis (if not skipped)
-    ai_results = None
-    if not skip_ai:
-        console.print("[bold yellow]3️⃣ AI 코드 리뷰 실행 중...[/bold yellow]")
-        ai_analyzer = AIAnalyzer(path, mode)
-        ai_results = ai_analyzer.analyze()
-        console.print(f"[green]✓ AI 분석 완료[/green]\n")
-    else:
-        console.print("[bold yellow]3️⃣ AI 분석 건너뜀[/bold yellow]\n")
+    engine = AnalyzerEngine(
+        project_path=path,
+        mode=mode,
+        skip_ai=skip_ai,
+        use_cache=use_cache,
+        save_history=save_history,
+        progress_callback=progress_callback
+    )
+
+    try:
+        console.print("[bold yellow]2️⃣ 정적 분석 실행 중...[/bold yellow]")
+        if not skip_ai:
+            console.print("[bold yellow]3️⃣ AI 코드 리뷰 실행 중...[/bold yellow]")
+        else:
+            console.print("[bold yellow]3️⃣ AI 분석 건너뜀[/bold yellow]\n")
+
+        result = engine.analyze()
+
+        languages = result['languages']
+        static_results = result['static_results']
+        ai_results = result['ai_results']
+
+    except (ValueError, RuntimeError) as e:
+        # Error already displayed by progress callback
+        sys.exit(1)
 
     # Step 4: Generate report
     console.print("[bold cyan]📋 분석 결과 리포트[/bold cyan]\n")
@@ -291,16 +305,6 @@ def audit(path: Path, mode: Optional[str], skip_ai: bool, verbose: bool, quiet: 
             html_reporter = HTMLReporter(mode)
             html_reporter.generate_report(static_results, ai_results, path, output)
             console.print(f"\n[green]✓ HTML 리포트 저장됨:[/green] {output}")
-
-    # Save to history (unless --no-history is set)
-    if not no_history:
-        try:
-            history_tracker = HistoryTracker(path)
-            history_tracker.save_result(mode, static_results, ai_results)
-            logger.debug("Analysis result saved to history")
-        except Exception as e:
-            logger.warning(f"Failed to save history: {e}")
-            # Don't fail the whole analysis just because history failed
 
     console.print("\n[bold green]✅ 분석 완료![/bold green]\n")
 
