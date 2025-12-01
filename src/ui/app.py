@@ -12,6 +12,8 @@ from pathlib import Path
 import time
 from typing import Optional, Dict, Any
 import sys
+import json
+from datetime import datetime
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -19,6 +21,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from src.core.analyzer_engine import AnalyzerEngine, AnalysisProgress
 from src.config.settings import ANALYSIS_MODES
 from src.utils.logger import setup_logger
+from src.reporters.json_reporter import JSONReporter
+from src.reporters.html_reporter import HTMLReporter
 
 logger = setup_logger(__name__)
 
@@ -40,6 +44,10 @@ def init_session_state():
         st.session_state.analysis_running = False
     if 'progress' not in st.session_state:
         st.session_state.progress = AnalysisProgress()
+    if 'page_number' not in st.session_state:
+        st.session_state.page_number = 0
+    if 'items_per_page' not in st.session_state:
+        st.session_state.items_per_page = 20
 
 
 def render_header():
@@ -59,15 +67,39 @@ def render_sidebar() -> Dict[str, Any]:
     with st.sidebar:
         st.header("⚙️ 분석 설정")
 
-        # Project path selection
+        # Project path selection with file browser
         st.subheader("1️⃣ 프로젝트 선택")
+
+        # Manual path input
         project_path = st.text_input(
             "프로젝트 폴더 경로",
             placeholder="C:/Users/YourName/project",
             help="분석할 프로젝트의 전체 경로를 입력하세요"
         )
 
-        # Browse button hint
+        # Quick access to common locations
+        with st.expander("📂 빠른 경로 선택"):
+            desktop = str(Path.home() / "Desktop")
+            documents = str(Path.home() / "Documents")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🖥️ 바탕화면", use_container_width=True):
+                    st.session_state.quick_path = desktop
+                    st.rerun()
+            with col2:
+                if st.button("📁 문서", use_container_width=True):
+                    st.session_state.quick_path = documents
+                    st.rerun()
+
+            if st.button("🏠 홈 디렉토리", use_container_width=True):
+                st.session_state.quick_path = str(Path.home())
+                st.rerun()
+
+        # Apply quick path if selected
+        if 'quick_path' in st.session_state and not project_path:
+            project_path = st.session_state.quick_path
+
         st.caption("💡 Tip: 탐색기에서 폴더를 복사하여 붙여넣으세요")
 
         st.divider()
@@ -117,13 +149,25 @@ def render_sidebar() -> Dict[str, Any]:
             disabled=not project_path or st.session_state.analysis_running
         )
 
+        # History viewer button
+        if project_path and Path(project_path).exists():
+            st.divider()
+            st.subheader("📜 히스토리")
+            show_history = st.button(
+                "📈 히스토리 보기",
+                use_container_width=True
+            )
+        else:
+            show_history = False
+
         return {
             'project_path': project_path,
             'mode': mode,
             'skip_ai': skip_ai,
             'use_cache': use_cache,
             'save_history': save_history,
-            'start_button': start_button
+            'start_button': start_button,
+            'show_history': show_history
         }
 
 
@@ -155,12 +199,235 @@ def render_progress_display():
     return progress_bar
 
 
-def render_results_summary(results: Dict[str, Any]):
+def render_download_buttons(results: Dict[str, Any], project_path: Path, mode: str):
+    """
+    Render download buttons for results.
+
+    Args:
+        results: Analysis results
+        project_path: Project path
+        mode: Analysis mode
+    """
+    st.subheader("💾 결과 다운로드")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # JSON download
+        json_data = {
+            'timestamp': datetime.now().isoformat(),
+            'project_path': str(project_path),
+            'mode': mode,
+            'languages': results.get('languages', []),
+            'static_results': results.get('static_results', {}),
+            'ai_results': results.get('ai_results')
+        }
+
+        json_str = json.dumps(json_data, indent=2, ensure_ascii=False)
+
+        st.download_button(
+            label="📄 JSON 다운로드",
+            data=json_str,
+            file_name=f"vibe-audit-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
+            mime="application/json",
+            use_container_width=True
+        )
+
+    with col2:
+        # HTML download
+        try:
+            html_reporter = HTMLReporter(mode)
+
+            # Generate HTML in memory
+            temp_path = Path("temp_report.html")
+            html_reporter.generate_report(
+                results['static_results'],
+                results.get('ai_results'),
+                project_path,
+                temp_path
+            )
+
+            # Read generated HTML
+            with open(temp_path, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+
+            # Clean up temp file
+            temp_path.unlink(missing_ok=True)
+
+            st.download_button(
+                label="📊 HTML 다운로드",
+                data=html_content,
+                file_name=f"vibe-audit-{datetime.now().strftime('%Y%m%d-%H%M%S')}.html",
+                mime="text/html",
+                use_container_width=True
+            )
+        except Exception as e:
+            st.error(f"HTML 생성 실패: {e}")
+
+
+def render_paginated_issues(issues: list, title: str):
+    """
+    Render paginated issue list.
+
+    Args:
+        issues: List of issues
+        title: Section title
+    """
+    if not issues:
+        st.success(f"{title}에서 이슈를 발견하지 못했습니다! 🎉")
+        return
+
+    # Pagination controls
+    items_per_page = st.session_state.items_per_page
+    total_pages = (len(issues) - 1) // items_per_page + 1
+
+    col1, col2, col3 = st.columns([2, 3, 2])
+
+    with col1:
+        new_items = st.selectbox(
+            "페이지당 항목 수",
+            options=[10, 20, 50, 100],
+            index=1,
+            key=f"items_select_{title}"
+        )
+        if new_items != st.session_state.items_per_page:
+            st.session_state.items_per_page = new_items
+            st.session_state.page_number = 0
+            st.rerun()
+
+    with col2:
+        st.write(f"**총 {len(issues)}개 이슈** (페이지 {st.session_state.page_number + 1}/{total_pages})")
+
+    with col3:
+        col_prev, col_next = st.columns(2)
+        with col_prev:
+            if st.button("◀ 이전", disabled=st.session_state.page_number == 0, use_container_width=True, key=f"prev_{title}"):
+                st.session_state.page_number = max(0, st.session_state.page_number - 1)
+                st.rerun()
+        with col_next:
+            if st.button("다음 ▶", disabled=st.session_state.page_number >= total_pages - 1, use_container_width=True, key=f"next_{title}"):
+                st.session_state.page_number = min(total_pages - 1, st.session_state.page_number + 1)
+                st.rerun()
+
+    st.divider()
+
+    # Calculate pagination
+    start_idx = st.session_state.page_number * items_per_page
+    end_idx = min(start_idx + items_per_page, len(issues))
+    page_issues = issues[start_idx:end_idx]
+
+    # Display issues
+    for idx, issue in enumerate(page_issues, start=start_idx + 1):
+        severity_emoji = {
+            'critical': '🔴',
+            'warning': '🟡',
+            'info': '🟢'
+        }.get(issue.get('severity', 'info'), '⚪')
+
+        with st.expander(f"{idx}. {severity_emoji} {issue.get('message', 'No message')[:100]}..."):
+            st.write(f"**파일**: {issue.get('file', 'N/A')}")
+            st.write(f"**라인**: {issue.get('line', 'N/A')}")
+            st.write(f"**도구**: {issue.get('tool', 'N/A')}")
+            st.write(f"**심각도**: {issue.get('severity', 'N/A')}")
+            st.write(f"**메시지**: {issue.get('message', 'N/A')}")
+
+
+def render_history_viewer(project_path: Path):
+    """
+    Render history comparison viewer.
+
+    Args:
+        project_path: Project path
+    """
+    st.header("📈 분석 히스토리")
+
+    try:
+        engine = AnalyzerEngine(project_path)
+        trend_data = engine.get_trend_data()
+
+        if trend_data['total_runs'] == 0:
+            st.info("아직 분석 히스토리가 없습니다.")
+            return
+
+        # Summary
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.metric("총 분석 횟수", trend_data['total_runs'])
+
+        with col2:
+            st.metric("현재 이슈", trend_data['current_issues'])
+
+        with col3:
+            change = trend_data['change']
+            st.metric("변화량", f"{change:+d}", delta=f"{trend_data['change_percent']:+.1f}%")
+
+        with col4:
+            trend_emoji = {
+                'improving': '📈 개선 중',
+                'declining': '📉 악화 중',
+                'stable': '➡️ 안정'
+            }.get(trend_data['trend'], '➡️ 안정')
+            st.metric("추세", trend_emoji)
+
+        st.divider()
+
+        # Timeline chart
+        timeline = trend_data.get('timeline', [])
+        if timeline:
+            import plotly.graph_objects as go
+
+            timestamps = [datetime.fromisoformat(e['timestamp']).strftime('%m/%d %H:%M') for e in timeline[-20:]]
+            critical = [e['critical'] for e in timeline[-20:]]
+            warning = [e['warning'] for e in timeline[-20:]]
+            info_count = [e['info'] for e in timeline[-20:]]
+
+            fig = go.Figure()
+
+            fig.add_trace(go.Scatter(x=timestamps, y=critical, name='Critical', line=dict(color='red'), stackgroup='one'))
+            fig.add_trace(go.Scatter(x=timestamps, y=warning, name='Warning', line=dict(color='orange'), stackgroup='one'))
+            fig.add_trace(go.Scatter(x=timestamps, y=info_count, name='Info', line=dict(color='green'), stackgroup='one'))
+
+            fig.update_layout(
+                title="이슈 추이 (최근 20회)",
+                xaxis_title="시간",
+                yaxis_title="이슈 개수",
+                hovermode='x unified',
+                height=400
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+        # Recent history table
+        st.subheader("최근 분석 기록")
+
+        history_data = []
+        for entry in timeline[-10:]:
+            history_data.append({
+                '시간': datetime.fromisoformat(entry['timestamp']).strftime('%Y-%m-%d %H:%M'),
+                '총 이슈': entry['total_issues'],
+                'Critical': entry['critical'],
+                'Warning': entry['warning'],
+                'Info': entry['info']
+            })
+
+        if history_data:
+            import pandas as pd
+            df = pd.DataFrame(history_data)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+
+    except Exception as e:
+        st.error(f"히스토리 로드 실패: {e}")
+
+
+def render_results_summary(results: Dict[str, Any], project_path: Path, mode: str):
     """
     Render analysis results summary.
 
     Args:
         results: Analysis results dictionary
+        project_path: Project path
+        mode: Analysis mode
     """
     st.header("📊 분석 결과")
 
@@ -204,6 +471,11 @@ def render_results_summary(results: Dict[str, Any]):
             value=info_count,
             delta=None
         )
+
+    st.divider()
+
+    # Download buttons
+    render_download_buttons(results, project_path, mode)
 
     st.divider()
 
@@ -252,7 +524,7 @@ def render_summary_tab(results: Dict[str, Any]):
             'info': sum(1 for i in static_issues if i.get('severity') == 'info'),
         }
 
-        # Simple bar chart
+        # Plotly bar chart
         import plotly.graph_objects as go
 
         fig = go.Figure(data=[
@@ -276,7 +548,7 @@ def render_summary_tab(results: Dict[str, Any]):
 
 
 def render_static_analysis_tab(static_results: Dict[str, Any]):
-    """Render static analysis results tab."""
+    """Render static analysis results tab with pagination."""
     st.subheader("정적 분석 결과")
 
     issues = static_results.get('issues', [])
@@ -284,6 +556,10 @@ def render_static_analysis_tab(static_results: Dict[str, Any]):
     if not issues:
         st.success("정적 분석에서 이슈를 발견하지 못했습니다! 🎉")
         return
+
+    # Reset page number when changing filters
+    if 'last_severity_filter' not in st.session_state:
+        st.session_state.last_severity_filter = ['critical', 'warning', 'info']
 
     # Filter by severity
     severity_filter = st.multiselect(
@@ -293,26 +569,15 @@ def render_static_analysis_tab(static_results: Dict[str, Any]):
         format_func=lambda x: f"{'🔴 Critical' if x == 'critical' else '🟡 Warning' if x == 'warning' else '🟢 Info'}"
     )
 
+    # Reset page if filter changed
+    if severity_filter != st.session_state.last_severity_filter:
+        st.session_state.page_number = 0
+        st.session_state.last_severity_filter = severity_filter
+
     filtered_issues = [i for i in issues if i.get('severity') in severity_filter]
 
-    st.write(f"**총 {len(filtered_issues)}개 이슈 발견**")
-
-    # Display issues
-    for idx, issue in enumerate(filtered_issues[:50], 1):  # Limit to 50 for performance
-        severity_emoji = {
-            'critical': '🔴',
-            'warning': '🟡',
-            'info': '🟢'
-        }.get(issue.get('severity', 'info'), '⚪')
-
-        with st.expander(f"{severity_emoji} {issue.get('message', 'No message')[:100]}..."):
-            st.write(f"**파일**: {issue.get('file', 'N/A')}")
-            st.write(f"**라인**: {issue.get('line', 'N/A')}")
-            st.write(f"**도구**: {issue.get('tool', 'N/A')}")
-            st.write(f"**메시지**: {issue.get('message', 'N/A')}")
-
-    if len(filtered_issues) > 50:
-        st.info(f"처음 50개 이슈만 표시됩니다. 전체 {len(filtered_issues)}개 이슈가 있습니다.")
+    # Render paginated issues
+    render_paginated_issues(filtered_issues, "정적 분석")
 
 
 def render_ai_analysis_tab(ai_results: Optional[Dict[str, Any]]):
@@ -338,7 +603,7 @@ def render_ai_analysis_tab(ai_results: Optional[Dict[str, Any]]):
             'info': '🟢'
         }.get(insight.get('severity', 'info'), '⚪')
 
-        with st.expander(f"{severity_emoji} {insight.get('category', 'General')}: {insight.get('message', 'No message')[:80]}..."):
+        with st.expander(f"{idx}. {severity_emoji} {insight.get('category', 'General')}: {insight.get('message', 'No message')[:80]}..."):
             st.write(f"**카테고리**: {insight.get('category', 'N/A')}")
             st.write(f"**심각도**: {insight.get('severity', 'N/A')}")
             st.write(f"**메시지**: {insight.get('message', 'N/A')}")
@@ -363,7 +628,23 @@ def render_languages_tab(languages: list, issues: list):
             if lang.lower() in issue.get('file', '').lower()
         )
 
-    # Display as simple table
+    # Pie chart
+    import plotly.graph_objects as go
+
+    fig = go.Figure(data=[go.Pie(
+        labels=list(language_issues.keys()),
+        values=list(language_issues.values()),
+        hole=.3
+    )])
+
+    fig.update_layout(
+        title="언어별 이슈 분포",
+        height=400
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Table
     st.write("**언어별 이슈 개수**")
     for lang, count in language_issues.items():
         st.write(f"- **{lang}**: {count}개 이슈")
@@ -378,6 +659,7 @@ def run_analysis(config: Dict[str, Any]):
     """
     st.session_state.analysis_running = True
     st.session_state.progress = AnalysisProgress()
+    st.session_state.page_number = 0  # Reset pagination
 
     # Progress callback
     def progress_callback(progress: AnalysisProgress):
@@ -437,8 +719,15 @@ def main():
     if st.session_state.analysis_running:
         st.header("⏳ 분석 진행 중...")
         render_progress_display()
+    elif config.get('show_history') and config['project_path']:
+        # Show history viewer
+        render_history_viewer(Path(config['project_path']))
     elif st.session_state.analysis_results:
-        render_results_summary(st.session_state.analysis_results)
+        render_results_summary(
+            st.session_state.analysis_results,
+            Path(config['project_path']),
+            config['mode']
+        )
     else:
         # Welcome screen
         st.info("👈 왼쪽 사이드바에서 프로젝트를 선택하고 분석을 시작하세요!")
@@ -448,6 +737,13 @@ def main():
         1. **프로젝트 선택**: 분석할 프로젝트 폴더 경로를 입력하세요
         2. **분석 관점 선택**: 배포 관점 또는 개인 사용 관점을 선택하세요
         3. **분석 시작**: '🚀 분석 시작' 버튼을 클릭하세요
+
+        ### ✨ 새로운 기능
+        - 📂 **빠른 경로 선택**: 바탕화면, 문서 폴더 빠른 접근
+        - 📄 **결과 다운로드**: JSON/HTML 형식으로 저장
+        - 📈 **히스토리 뷰어**: 과거 분석 결과 및 추세 확인
+        - 📊 **페이지네이션**: 대량 이슈도 편리하게 탐색 (10/20/50/100개씩)
+        - 🔍 **고급 필터링**: 심각도별 이슈 필터링
 
         ### 지원 언어
         Python, JavaScript, TypeScript, Go, Rust, PHP, Ruby, Kotlin, Swift, C#, Java
