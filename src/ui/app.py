@@ -23,6 +23,7 @@ from src.config.settings import ANALYSIS_MODES
 from src.utils.logger import setup_logger
 from src.reporters.json_reporter import JSONReporter
 from src.reporters.html_reporter import HTMLReporter
+from src.reporters.pdf_reporter import PDFReporter
 
 logger = setup_logger(__name__)
 
@@ -152,13 +153,28 @@ def render_sidebar() -> Dict[str, Any]:
         # History viewer button
         if project_path and Path(project_path).exists():
             st.divider()
-            st.subheader("📜 히스토리")
-            show_history = st.button(
-                "📈 히스토리 보기",
+            st.subheader("📜 히스토리 & 도구")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                show_history = st.button(
+                    "📈 히스토리",
+                    use_container_width=True
+                )
+            with col2:
+                show_comparison = st.button(
+                    "🔄 비교",
+                    use_container_width=True
+                )
+
+            show_tree = st.button(
+                "🌳 폴더 구조",
                 use_container_width=True
             )
         else:
             show_history = False
+            show_comparison = False
+            show_tree = False
 
         return {
             'project_path': project_path,
@@ -167,7 +183,9 @@ def render_sidebar() -> Dict[str, Any]:
             'use_cache': use_cache,
             'save_history': save_history,
             'start_button': start_button,
-            'show_history': show_history
+            'show_history': show_history,
+            'show_comparison': show_comparison,
+            'show_tree': show_tree
         }
 
 
@@ -210,7 +228,7 @@ def render_download_buttons(results: Dict[str, Any], project_path: Path, mode: s
     """
     st.subheader("💾 결과 다운로드")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         # JSON download
@@ -263,6 +281,36 @@ def render_download_buttons(results: Dict[str, Any], project_path: Path, mode: s
             )
         except Exception as e:
             st.error(f"HTML 생성 실패: {e}")
+
+    with col3:
+        # PDF download
+        try:
+            pdf_reporter = PDFReporter(mode)
+
+            # Generate PDF in memory
+            temp_path = Path("temp_report.pdf")
+            pdf_reporter.generate_report(
+                results,
+                project_path,
+                temp_path
+            )
+
+            # Read generated PDF
+            with open(temp_path, 'rb') as f:
+                pdf_content = f.read()
+
+            # Clean up temp file
+            temp_path.unlink(missing_ok=True)
+
+            st.download_button(
+                label="📑 PDF 다운로드",
+                data=pdf_content,
+                file_name=f"vibe-audit-{datetime.now().strftime('%Y%m%d-%H%M%S')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+        except Exception as e:
+            st.error(f"PDF 생성 실패: {e}")
 
 
 def render_paginated_issues(issues: list, title: str):
@@ -418,6 +466,310 @@ def render_history_viewer(project_path: Path):
 
     except Exception as e:
         st.error(f"히스토리 로드 실패: {e}")
+
+
+def render_comparison_mode(project_path: Path):
+    """
+    Render comparison mode for comparing two analysis results.
+
+    Args:
+        project_path: Project path
+    """
+    st.header("🔄 분석 결과 비교")
+
+    try:
+        engine = AnalyzerEngine(project_path)
+        trend_data = engine.get_trend_data()
+        timeline = trend_data.get('timeline', [])
+
+        if len(timeline) < 2:
+            st.info("비교하려면 최소 2개의 분석 결과가 필요합니다.")
+            st.write("먼저 프로젝트를 여러 번 분석해주세요.")
+            return
+
+        # Select two analysis results to compare
+        st.subheader("비교할 분석 결과 선택")
+
+        col1, col2 = st.columns(2)
+
+        # Format timeline entries for selectbox
+        timeline_options = [
+            f"{datetime.fromisoformat(e['timestamp']).strftime('%Y-%m-%d %H:%M')} (총 {e['total_issues']}개 이슈)"
+            for e in timeline
+        ]
+
+        with col1:
+            st.write("**이전 분석 (기준)**")
+            baseline_idx = st.selectbox(
+                "이전 분석 선택",
+                range(len(timeline)),
+                format_func=lambda i: timeline_options[i],
+                index=max(0, len(timeline) - 2),
+                key="baseline_select"
+            )
+
+        with col2:
+            st.write("**최근 분석 (비교 대상)**")
+            current_idx = st.selectbox(
+                "최근 분석 선택",
+                range(len(timeline)),
+                format_func=lambda i: timeline_options[i],
+                index=len(timeline) - 1,
+                key="current_select"
+            )
+
+        if baseline_idx == current_idx:
+            st.warning("⚠️ 서로 다른 분석 결과를 선택해주세요.")
+            return
+
+        baseline = timeline[baseline_idx]
+        current = timeline[current_idx]
+
+        st.divider()
+
+        # Comparison summary
+        st.subheader("📊 비교 요약")
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        total_change = current['total_issues'] - baseline['total_issues']
+        critical_change = current['critical'] - baseline['critical']
+        warning_change = current['warning'] - baseline['warning']
+        info_change = current['info'] - baseline['info']
+
+        with col1:
+            st.metric(
+                "총 이슈",
+                current['total_issues'],
+                delta=total_change,
+                delta_color="inverse"
+            )
+
+        with col2:
+            st.metric(
+                "Critical",
+                current['critical'],
+                delta=critical_change,
+                delta_color="inverse"
+            )
+
+        with col3:
+            st.metric(
+                "Warning",
+                current['warning'],
+                delta=warning_change,
+                delta_color="inverse"
+            )
+
+        with col4:
+            st.metric(
+                "Info",
+                current['info'],
+                delta=info_change,
+                delta_color="inverse"
+            )
+
+        st.divider()
+
+        # Detailed comparison chart
+        st.subheader("📈 상세 비교")
+
+        import plotly.graph_objects as go
+
+        categories = ['Critical', 'Warning', 'Info']
+        baseline_values = [baseline['critical'], baseline['warning'], baseline['info']]
+        current_values = [current['critical'], current['warning'], current['info']]
+
+        fig = go.Figure(data=[
+            go.Bar(name='이전', x=categories, y=baseline_values, marker_color='lightblue'),
+            go.Bar(name='최근', x=categories, y=current_values, marker_color='darkblue')
+        ])
+
+        fig.update_layout(
+            title="심각도별 이슈 비교",
+            xaxis_title="심각도",
+            yaxis_title="이슈 개수",
+            barmode='group',
+            height=400
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Analysis
+        st.subheader("💡 분석")
+
+        if total_change < 0:
+            st.success(f"✅ 총 {abs(total_change)}개의 이슈가 해결되었습니다! 코드 품질이 개선되었습니다.")
+        elif total_change > 0:
+            st.error(f"⚠️ 총 {total_change}개의 새로운 이슈가 발견되었습니다. 코드 리뷰가 필요합니다.")
+        else:
+            st.info("ℹ️ 이슈 개수에 변화가 없습니다.")
+
+        # Detailed breakdown
+        with st.expander("📋 상세 변화 내역"):
+            st.write("### Critical 이슈")
+            if critical_change < 0:
+                st.write(f"- ✅ {abs(critical_change)}개 해결")
+            elif critical_change > 0:
+                st.write(f"- ❌ {critical_change}개 추가")
+            else:
+                st.write("- ➡️ 변화 없음")
+
+            st.write("### Warning 이슈")
+            if warning_change < 0:
+                st.write(f"- ✅ {abs(warning_change)}개 해결")
+            elif warning_change > 0:
+                st.write(f"- ❌ {warning_change}개 추가")
+            else:
+                st.write("- ➡️ 변화 없음")
+
+            st.write("### Info 이슈")
+            if info_change < 0:
+                st.write(f"- ✅ {abs(info_change)}개 해결")
+            elif info_change > 0:
+                st.write(f"- ❌ {info_change}개 추가")
+            else:
+                st.write("- ➡️ 변화 없음")
+
+    except Exception as e:
+        st.error(f"비교 모드 로드 실패: {e}")
+
+
+def render_folder_tree(project_path: Path):
+    """
+    Render folder tree viewer.
+
+    Args:
+        project_path: Project path
+    """
+    st.header("🌳 프로젝트 폴더 구조")
+
+    st.info("프로젝트의 폴더 구조를 표시합니다. 분석 대상 파일을 확인할 수 있습니다.")
+
+    try:
+        # File extensions for analysis
+        analyzable_extensions = {
+            '.py', '.js', '.ts', '.jsx', '.tsx',
+            '.go', '.rs', '.php', '.rb', '.kt',
+            '.swift', '.cs', '.java'
+        }
+
+        # Exclude directories
+        exclude_dirs = {
+            'node_modules', '__pycache__', '.git', '.venv',
+            'venv', 'env', 'dist', 'build', '.idea',
+            '.vscode', 'coverage', '.pytest_cache'
+        }
+
+        def build_tree(path: Path, prefix: str = "", is_last: bool = True, depth: int = 0, max_depth: int = 5):
+            """Build tree structure recursively"""
+            if depth > max_depth:
+                return []
+
+            lines = []
+
+            if not path.exists():
+                return lines
+
+            # Current item
+            connector = "└── " if is_last else "├── "
+            name = path.name
+
+            # Check if analyzable
+            is_analyzable = path.is_file() and path.suffix in analyzable_extensions
+            icon = "📄" if path.is_file() else "📁"
+            suffix = " ⭐" if is_analyzable else ""
+
+            lines.append(f"{prefix}{connector}{icon} {name}{suffix}")
+
+            # Process children if directory
+            if path.is_dir() and name not in exclude_dirs:
+                # Get children
+                try:
+                    children = sorted(path.iterdir(), key=lambda p: (not p.is_dir(), p.name))
+                    # Limit children to avoid too many items
+                    if len(children) > 50:
+                        children = children[:50]
+                        has_more = True
+                    else:
+                        has_more = False
+
+                    extension = "    " if is_last else "│   "
+
+                    for i, child in enumerate(children):
+                        is_last_child = (i == len(children) - 1) and not has_more
+                        lines.extend(build_tree(
+                            child,
+                            prefix + extension,
+                            is_last_child,
+                            depth + 1,
+                            max_depth
+                        ))
+
+                    if has_more:
+                        lines.append(f"{prefix}{extension}└── ... ({len(list(path.iterdir())) - 50} more items)")
+
+                except PermissionError:
+                    pass
+
+            return lines
+
+        # Build tree
+        tree_lines = [f"📁 {project_path.name}"]
+        try:
+            children = sorted(project_path.iterdir(), key=lambda p: (not p.is_dir(), p.name))
+
+            for i, child in enumerate(children):
+                is_last = (i == len(children) - 1)
+                tree_lines.extend(build_tree(child, "", is_last, depth=1, max_depth=4))
+
+        except PermissionError:
+            st.error("프로젝트 폴더에 접근할 수 없습니다.")
+            return
+
+        # Display tree
+        st.code("\n".join(tree_lines), language="text")
+
+        # Statistics
+        st.divider()
+        st.subheader("📊 파일 통계")
+
+        # Count files
+        total_files = 0
+        analyzable_files = 0
+        file_counts = {}
+
+        for file_path in project_path.rglob("*"):
+            if file_path.is_file():
+                # Skip excluded directories
+                if any(excl in file_path.parts for excl in exclude_dirs):
+                    continue
+
+                total_files += 1
+
+                ext = file_path.suffix
+                if ext in analyzable_extensions:
+                    analyzable_files += 1
+                    file_counts[ext] = file_counts.get(ext, 0) + 1
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.metric("총 파일 수", total_files)
+
+        with col2:
+            st.metric("분석 가능 파일", analyzable_files)
+
+        # File type breakdown
+        if file_counts:
+            st.write("**파일 유형별 분포**")
+            for ext, count in sorted(file_counts.items(), key=lambda x: x[1], reverse=True):
+                st.write(f"- `{ext}`: {count}개")
+
+        st.info("⭐ 표시된 파일은 분석 대상 파일입니다.")
+
+    except Exception as e:
+        st.error(f"폴더 구조 표시 실패: {e}")
 
 
 def render_results_summary(results: Dict[str, Any], project_path: Path, mode: str):
@@ -722,6 +1074,12 @@ def main():
     elif config.get('show_history') and config['project_path']:
         # Show history viewer
         render_history_viewer(Path(config['project_path']))
+    elif config.get('show_comparison') and config['project_path']:
+        # Show comparison mode
+        render_comparison_mode(Path(config['project_path']))
+    elif config.get('show_tree') and config['project_path']:
+        # Show folder tree viewer
+        render_folder_tree(Path(config['project_path']))
     elif st.session_state.analysis_results:
         render_results_summary(
             st.session_state.analysis_results,
@@ -738,10 +1096,12 @@ def main():
         2. **분석 관점 선택**: 배포 관점 또는 개인 사용 관점을 선택하세요
         3. **분석 시작**: '🚀 분석 시작' 버튼을 클릭하세요
 
-        ### ✨ 새로운 기능
+        ### ✨ v1.9.0 새로운 기능
         - 📂 **빠른 경로 선택**: 바탕화면, 문서 폴더 빠른 접근
-        - 📄 **결과 다운로드**: JSON/HTML 형식으로 저장
+        - 📄 **결과 다운로드**: JSON/HTML/PDF 형식으로 저장
         - 📈 **히스토리 뷰어**: 과거 분석 결과 및 추세 확인
+        - 🔄 **비교 모드**: 두 분석 결과 비교 및 개선/악화 추적
+        - 🌳 **폴더 트리 뷰어**: 프로젝트 구조 및 분석 대상 파일 확인
         - 📊 **페이지네이션**: 대량 이슈도 편리하게 탐색 (10/20/50/100개씩)
         - 🔍 **고급 필터링**: 심각도별 이슈 필터링
 

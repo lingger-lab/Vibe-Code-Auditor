@@ -10,6 +10,12 @@ pyyaml==6.0.2
 streamlit==1.51.0
 plotly==6.5.0
 
+# PDF generation
+reportlab==4.2.5
+
+# Build dependencies
+pyinstaller==6.17.0
+
 # Testing dependencies
 pytest==7.4.3
 pytest-cov==4.1.0

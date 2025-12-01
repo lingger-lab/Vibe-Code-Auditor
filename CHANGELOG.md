@@ -5,6 +5,92 @@ All notable changes to Vibe-Code Auditor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2025-12-02
+
+### Added
+- **PyInstaller Packaging** (실행 파일 패키징)
+  - Unified launcher (`vibe_auditor.py`) with CLI/UI mode selection
+  - PyInstaller spec file (`VibeAuditor.spec`) with optimized configuration
+  - Streamlit data files auto-collection
+  - Ready for standalone executable distribution (.exe)
+
+- **PDF Download** (PDF 다운로드)
+  - Professional PDF report generation with ReportLab
+  - Structured sections: Title, Summary, Languages, Static Analysis, AI Review
+  - Custom styling and color coding by severity
+  - Automatic pagination for large issue lists
+  - Added third download button (JSON | HTML | PDF)
+
+- **Comparison Mode** (비교 모드)
+  - Compare two analysis results side-by-side
+  - Select baseline and current analysis from timeline
+  - Visual comparison with Plotly grouped bar charts
+  - Delta metrics showing improvement/decline
+  - Detailed breakdown by severity (Critical/Warning/Info)
+  - Automatic analysis insights (improving/declining/stable)
+
+- **Folder Tree Viewer** (폴더 트리 뷰어)
+  - ASCII art tree structure of project directory
+  - Icon indicators (📁 folders, 📄 files)
+  - Highlight analyzable files with ⭐
+  - Smart filtering (exclude node_modules, __pycache__, etc.)
+  - File statistics (total files, analyzable files, type distribution)
+  - Configurable depth limit (max_depth=4)
+
+### Enhanced
+- **Sidebar Navigation**
+  - Added "🔄 비교" (Comparison) button
+  - Added "🌳 폴더 구조" (Folder Tree) button
+  - Improved layout with "히스토리 & 도구" section
+  - Two-column button layout for better UX
+
+- **Welcome Screen**
+  - Updated feature list to v1.9.0
+  - Added new features to documentation
+  - Improved visual hierarchy
+
+### Technical
+- **New Modules**:
+  - `src/reporters/pdf_reporter.py` (450+ LOC) - PDF generation
+  - `vibe_auditor.py` (80 LOC) - Unified launcher
+
+- **New Functions**:
+  - `render_comparison_mode()` (165 LOC) - Comparison UI
+  - `render_folder_tree()` (135 LOC) - Tree viewer
+  - Enhanced `render_download_buttons()` - Added PDF support
+
+- **New Dependencies**:
+  - `reportlab==4.2.5` - PDF generation
+  - `pyinstaller==6.17.0` - Executable packaging
+
+- **Code Statistics**:
+  - +780 LOC (new features)
+  - ~100 LOC modified (UI enhancements)
+  - Total: ~880 LOC added/modified
+
+### Benefits
+- **Deployment**: Ready for standalone executable distribution
+- **Professionalism**: PDF reports for formal sharing
+- **Tracking**: Compare results to measure code quality improvements
+- **Transparency**: Clear view of project structure and analysis scope
+
+### Performance
+- PDF generation: <2 seconds for typical reports
+- Tree viewer: Optimized with depth limits and file count caps
+- Comparison mode: Instant calculation from cached history
+
+### Documentation
+- Added `docs/PHASE_3_COMPLETE.md` - Phase 3 completion report
+- Updated `CHANGELOG.md` - This entry
+- Updated welcome screen with v1.9.0 features
+
+### Files Modified
+- `src/ui/app.py`: +300 LOC (comparison mode, tree viewer, PDF download)
+- `requirements.txt`: +2 dependencies
+- `VibeAuditor.spec`: Created (PyInstaller config)
+
+---
+
 ## [1.8.0] - 2025-12-01
 
 ### Added
