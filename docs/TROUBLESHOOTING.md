@@ -47,7 +47,38 @@ ModuleNotFoundError: No module named 'streamlit'
 pip install -r requirements.txt
 ```
 
-### 문제 3: 포트 충돌 (Port 8501 already in use)
+### 문제 3: 잘못된 포트 사용 (Port 3000 instead of 8501)
+
+**증상:**
+- Streamlit이 포트 3000에서 실행됨
+- http://localhost:3000 에 연결 불가
+- 기대: http://localhost:8501
+
+**원인:**
+- Streamlit 기본 설정 부재
+- PyInstaller 빌드 시 config.toml 미포함
+
+**해결 방법 (v1.9.0+ 적용됨):**
+
+1. **최신 버전 사용** (v1.9.0+)
+   - `.streamlit/config.toml` 파일 포함
+   - 포트 8501로 고정 설정
+
+2. **수동 확인**
+   ```bash
+   # .streamlit/config.toml 존재 확인
+   cat .streamlit/config.toml
+
+   # 내용:
+   [server]
+   port = 8501
+   headless = true
+
+   [global]
+   developmentMode = false
+   ```
+
+### 문제 4: 포트 충돌 (Port 8501 already in use)
 
 **증상:**
 ```
@@ -300,6 +331,15 @@ tail -f /tmp/vibe-auditor/logs/app.log
 
 - ✅ **수정됨**: 실행 파일 크기 문제
   - ML 라이브러리 제외 (3.1GB → 140MB)
+
+- ✅ **수정됨**: 잘못된 포트 사용 (3000 대신 8501)
+  - .streamlit/config.toml 추가로 포트 고정
+
+- ✅ **수정됨**: PackageNotFoundError
+  - PyInstaller spec에 metadata 수집 추가
+
+- ✅ **수정됨**: 포트 설정 충돌 (developmentMode)
+  - 수동 포트 지정 제거, config 파일로 관리
 
 ### v1.8.0
 - ⚠️ **알려진 문제**: 대량 이슈 렌더링 느림
