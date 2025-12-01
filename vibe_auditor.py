@@ -50,24 +50,46 @@ def launch_ui():
     print("브라우저가 자동으로 열립니다 (http://localhost:8501)")
     print()
 
-    # Launch Streamlit UI
-    app_path = Path(__file__).parent / "src" / "ui" / "app.py"
-
     try:
-        subprocess.run([
-            sys.executable,
-            "-m",
+        # Add src directory to path for imports
+        src_path = Path(__file__).parent / "src"
+        if str(src_path) not in sys.path:
+            sys.path.insert(0, str(src_path))
+
+        # Import streamlit CLI and run directly
+        from streamlit.web import cli as stcli
+        import os
+
+        # Get app path
+        if getattr(sys, 'frozen', False):
+            # Running in PyInstaller bundle
+            app_path = os.path.join(sys._MEIPASS, "src", "ui", "app.py")
+        else:
+            # Running in normal Python
+            app_path = str(Path(__file__).parent / "src" / "ui" / "app.py")
+
+        # Set up Streamlit arguments
+        sys.argv = [
             "streamlit",
             "run",
-            str(app_path),
-            "--server.headless=true"
-        ])
+            app_path,
+            "--server.headless=true",
+            "--browser.gatherUsageStats=false",
+            "--server.port=8501"
+        ]
+
+        # Run Streamlit
+        sys.exit(stcli.main())
+
     except KeyboardInterrupt:
         print("\n\n✅ UI 모드를 종료합니다.")
     except Exception as e:
         print(f"❌ UI 모드 실행 오류: {e}")
-        print("다음 명령어로 직접 실행해보세요:")
+        print(f"오류 상세: {type(e).__name__}")
+        print("\n대안: 다음 명령어로 직접 실행해보세요:")
         print("  python run_ui.py")
+        print("\n또는 소스코드로 실행:")
+        print("  python -m streamlit run src/ui/app.py")
 
 
 def main():
