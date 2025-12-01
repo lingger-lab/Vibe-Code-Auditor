@@ -6,6 +6,10 @@ pylint==3.3.2
 pyyaml==6.0.2
 # semgrep==1.100.0  # Windows 미지원 - WSL/Linux 환경에서만 설치 가능
 
+# UI dependencies
+streamlit==1.51.0
+plotly==6.5.0
+
 # Testing dependencies
 pytest==7.4.3
 pytest-cov==4.1.0

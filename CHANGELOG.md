@@ -5,6 +5,74 @@ All notable changes to Vibe-Code Auditor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2025-12-01
+
+### Added
+- **Streamlit Web UI** (`src/ui/app.py`)
+  - Web-based user interface for non-technical users
+  - 3-click workflow: Select folder → Configure → Analyze
+  - Real-time progress display with progress bar
+  - Interactive results viewer with 4 tabs
+  - Plotly-based charts for data visualization
+  - Severity-based color coding and filtering
+
+- **UI Launcher Scripts**
+  - `run_ui.py` - Python launcher for cross-platform support
+  - `run_ui.bat` - Windows batch file for double-click execution
+
+- **Results Visualization**
+  - Summary tab with project overview and issue distribution chart
+  - Static analysis tab with filterable issue list (up to 50 issues)
+  - AI analysis tab with insights and recommendations
+  - Languages tab with per-language statistics
+
+- **Real-time Progress Tracking**
+  - Progress bar (0-100%)
+  - Stage-based messages (validation, detection, static_analysis, ai_analysis)
+  - Error display with helpful messages
+  - Language detection count
+
+### Changed
+- **requirements.txt**
+  - Added `streamlit==1.51.0` for web UI
+  - Added `plotly==6.5.0` for interactive charts
+
+- **Architecture**
+  - Multi-interface platform: CLI + UI
+  - Both interfaces share the same `AnalyzerEngine`
+  - Progress callback utilized for real-time UI updates
+
+### Technical
+- **New Module**: `src/ui/` with 2 files (~550 LOC)
+- **Launcher Scripts**: 2 files (~70 LOC)
+- **UI Features**:
+  - Streamlit session state management
+  - Progress callback integration
+  - Tab-based results organization
+  - Metric cards and charts
+  - Expandable issue details
+
+### Benefits
+- **Accessibility**: Non-developers can now use the tool via web interface
+- **User Experience**: Visual progress tracking and interactive results
+- **Code Reuse**: CLI and UI share 100% of analysis logic
+- **Flexibility**: Choose CLI (fast) or UI (friendly) based on preference
+
+### Documentation
+- Added `docs/PHASE_2_COMPLETE.md` - Complete Phase 2 documentation
+- Updated `CHANGELOG.md` - This entry
+
+### Usage
+```bash
+# UI Mode (all users)
+python run_ui.py
+
+# CLI Mode (developers)
+python -m src.cli.main --path ./project --mode deployment
+```
+
+---
+
 ## [1.6.0] - 2025-12-01
 
 ### Added

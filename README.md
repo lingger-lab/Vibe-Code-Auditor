@@ -1,14 +1,15 @@
 # 🔍 Vibe-Code Auditor
 
-**바이브코딩으로 개발한 프로젝트를 AI + 정적 분석 도구로 자동 점검하는 CLI 기반 코드 감사 도구**
+**바이브코딩으로 개발한 프로젝트를 AI + 정적 분석 도구로 자동 점검하는 멀티 인터페이스 코드 감사 플랫폼**
 
 ## 📋 주요 기능
 
 - ✅ **다국어 지원**: Python, JavaScript, TypeScript, Go, Rust, Java, PHP, C#, Ruby, Kotlin, Swift 등 11개 언어 지원
-- 🤖 **AI 코드 리뷰**: Claude Code API를 활용한 주관적 코드 분석
+- 🤖 **AI 코드 리뷰**: Claude API를 활용한 주관적 코드 분석
 - 🔒 **정적 분석**: Pylint, ESLint, Semgrep, staticcheck, clippy, PHPStan 등 15+ 도구 통합
 - 🎯 **관점별 분석**: 배포 관점(보안, 성능) vs 자가 사용 관점(가독성, 유지보수성)
-- 📊 **컬러 CLI 리포트**: Rich 라이브러리 기반 가독성 높은 터미널 출력
+- 🖥️ **멀티 인터페이스**: CLI (개발자용) + Web UI (모든 사용자용)
+- 📊 **시각화**: 인터랙티브 차트 및 실시간 진행 상황 표시
 - 💾 **결과 캐싱**: 99% 속도 향상 (변경되지 않은 파일 재분석 방지)
 - 📈 **히스토리 추적**: 분석 결과 추이 관리 및 트렌드 분석
 
@@ -20,26 +21,41 @@
 # 의존성 설치
 pip install -r requirements.txt
 
-# .env 파일 설정
+# .env 파일 설정 (AI 분석 사용 시)
 cp .env.example .env
 # .env 파일을 열어 ANTHROPIC_API_KEY 입력
 ```
 
 ### 2. 사용법
 
-#### 배포 관점 분석 (보안, 성능, 확장성 우선)
+#### 🖥️ UI 모드 (권장 - 모든 사용자용)
+
+```bash
+# 방법 1: Python 스크립트
+python run_ui.py
+
+# 방법 2: Windows 더블클릭
+run_ui.bat
+
+# 브라우저에서 자동으로 열립니다!
+# 3-클릭만으로 분석 완료: 폴더 선택 → 설정 → 시작
+```
+
+#### 💻 CLI 모드 (개발자용)
+
+##### 배포 관점 분석 (보안, 성능, 확장성 우선)
 
 ```bash
 python -m src.cli.main --path /path/to/your/project --mode deployment
 ```
 
-#### 자가 사용 관점 분석 (가독성, 유지보수성 우선)
+##### 자가 사용 관점 분석 (가독성, 유지보수성 우선)
 
 ```bash
 python -m src.cli.main --path /path/to/your/project --mode personal
 ```
 
-#### AI 분석 건너뛰기 (정적 분석만 수행)
+##### AI 분석 건너뛰기 (정적 분석만 수행)
 
 ```bash
 python -m src.cli.main --path /path/to/your/project --mode deployment --skip-ai
