@@ -24,7 +24,13 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        'tensorflow', 'tensorflow-gpu', 'tf_keras',
+        'torch', 'torchvision', 'torchaudio',
+        'sklearn', 'scikit-learn',
+        'scipy.linalg', 'scipy.stats', 'scipy.spatial',
+        'sympy', 'numba', 'llvmlite'
+    ],
     noarchive=False,
     optimize=0,
 )
