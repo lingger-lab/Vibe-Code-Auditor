@@ -1,14 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata
 
-# Collect Streamlit data files
+# Collect Streamlit data files and metadata
 streamlit_datas = collect_data_files('streamlit')
+streamlit_metadata = copy_metadata('streamlit')
+altair_metadata = copy_metadata('altair')
+plotly_metadata = copy_metadata('plotly')
 
 # Collect all submodules
 all_hidden_imports = [
     'streamlit', 'plotly', 'anthropic', 'rich', 'click', 'yaml', 'pylint',
-    'streamlit.web', 'streamlit.web.cli', 'altair', 'tornado',
+    'streamlit.web', 'streamlit.web.cli', 'streamlit.runtime',
+    'streamlit.runtime.scriptrunner', 'streamlit.runtime.state',
+    'altair', 'tornado', 'watchdog', 'validators',
     'plotly.graph_objs', 'pandas', 'numpy', 'pyarrow'
 ]
 
@@ -19,7 +24,7 @@ a = Analysis(
     datas=[
         ('src', 'src'),  # Include source code
         ('docs', 'docs'),  # Include documentation
-    ] + streamlit_datas,
+    ] + streamlit_datas + streamlit_metadata + altair_metadata + plotly_metadata,
     hiddenimports=all_hidden_imports,
     hookspath=[],
     hooksconfig={},
