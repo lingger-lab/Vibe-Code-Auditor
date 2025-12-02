@@ -10,11 +10,12 @@ plotly_metadata = copy_metadata('plotly')
 
 # Collect all submodules
 streamlit_submodules = collect_submodules('streamlit')
+reportlab_submodules = collect_submodules('reportlab')
 all_hidden_imports = [
     'plotly', 'anthropic', 'rich', 'click', 'yaml', 'pylint',
     'altair', 'tornado', 'watchdog', 'validators',
     'plotly.graph_objs', 'pandas', 'numpy', 'pyarrow'
-] + streamlit_submodules
+] + streamlit_submodules + reportlab_submodules
 
 a = Analysis(
     ['vibe_auditor.py'],
