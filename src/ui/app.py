@@ -80,20 +80,38 @@ def render_sidebar() -> Dict[str, Any]:
 
         # Quick access to common locations
         with st.expander("📂 빠른 경로 선택"):
+            import subprocess
+            import platform
+
             desktop = str(Path.home() / "Desktop")
             documents = str(Path.home() / "Documents")
+
+            def open_folder_in_explorer(folder_path):
+                """Open folder in system file explorer"""
+                try:
+                    if platform.system() == 'Windows':
+                        subprocess.run(['explorer', folder_path])
+                    elif platform.system() == 'Darwin':  # macOS
+                        subprocess.run(['open', folder_path])
+                    else:  # Linux
+                        subprocess.run(['xdg-open', folder_path])
+                except Exception as e:
+                    st.error(f"탐색기 열기 실패: {e}")
 
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("🖥️ 바탕화면", use_container_width=True):
+                    open_folder_in_explorer(desktop)
                     st.session_state.quick_path = desktop
                     st.rerun()
             with col2:
                 if st.button("📁 문서", use_container_width=True):
+                    open_folder_in_explorer(documents)
                     st.session_state.quick_path = documents
                     st.rerun()
 
             if st.button("🏠 홈 디렉토리", use_container_width=True):
+                open_folder_in_explorer(str(Path.home()))
                 st.session_state.quick_path = str(Path.home())
                 st.rerun()
 
