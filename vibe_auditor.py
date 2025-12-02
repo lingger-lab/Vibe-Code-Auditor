@@ -68,12 +68,15 @@ def launch_ui():
             # Running in normal Python
             app_path = str(Path(__file__).parent / "src" / "ui" / "app.py")
 
-        # Set up Streamlit arguments
+        # Set up Streamlit arguments with explicit port configuration
         sys.argv = [
             "streamlit",
             "run",
             app_path,
+            "--server.port=3000",
             "--server.headless=false",
+            "--server.enableCORS=true",
+            "--server.enableXsrfProtection=false",
             "--browser.gatherUsageStats=false"
         ]
 
