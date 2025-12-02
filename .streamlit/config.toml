@@ -1,11 +1,10 @@
 [browser]
 gatherUsageStats = false
-serverPort = 3000
 
 [server]
 port = 3000
-headless = true
-enableCORS = false
+headless = false
+enableCORS = true
 enableXsrfProtection = false
 
 [global]
