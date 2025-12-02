@@ -9,13 +9,12 @@ altair_metadata = copy_metadata('altair')
 plotly_metadata = copy_metadata('plotly')
 
 # Collect all submodules
+streamlit_submodules = collect_submodules('streamlit')
 all_hidden_imports = [
-    'streamlit', 'plotly', 'anthropic', 'rich', 'click', 'yaml', 'pylint',
-    'streamlit.web', 'streamlit.web.cli', 'streamlit.runtime',
-    'streamlit.runtime.scriptrunner', 'streamlit.runtime.state',
+    'plotly', 'anthropic', 'rich', 'click', 'yaml', 'pylint',
     'altair', 'tornado', 'watchdog', 'validators',
     'plotly.graph_objs', 'pandas', 'numpy', 'pyarrow'
-]
+] + streamlit_submodules
 
 a = Analysis(
     ['vibe_auditor.py'],
