@@ -77,6 +77,7 @@ def launch_ui():
             "--server.headless=false",
             "--server.enableCORS=true",
             "--server.enableXsrfProtection=false",
+            "--global.developmentMode=false",
             "--browser.gatherUsageStats=false"
         ]
 
