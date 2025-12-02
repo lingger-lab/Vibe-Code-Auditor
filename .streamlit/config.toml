@@ -1,9 +1,9 @@
 [browser]
 gatherUsageStats = false
-serverPort = 8501
+serverPort = 3000
 
 [server]
-port = 8501
+port = 3000
 headless = true
 enableCORS = false
 enableXsrfProtection = false

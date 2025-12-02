@@ -47,7 +47,7 @@ def launch_cli():
 def launch_ui():
     """Launch UI mode"""
     print("\n🌐 UI 모드를 시작합니다...")
-    print("브라우저가 자동으로 열립니다 (http://localhost:8501)")
+    print("브라우저가 자동으로 열립니다 (http://localhost:3000)")
     print()
 
     try:
