@@ -4,14 +4,13 @@ Choose between CLI mode or UI mode
 """
 
 import sys
-import subprocess
 from pathlib import Path
 
 
 def print_banner():
     """Print application banner"""
     print("=" * 60)
-    print("  Vibe-Code Auditor v1.9.0")
+    print("  Vibe-Code Auditor v1.10.0")
     print("  AI 기반 코드 품질 분석 플랫폼")
     print("=" * 60)
     print()
@@ -34,11 +33,16 @@ def launch_cli():
 
     # Import and run CLI
     try:
-        from src.cli import main as cli_main
+        from src.cli.main import audit
         # Pass remaining arguments to CLI
-        sys.argv = ['vibe_auditor'] + sys.argv[1:]
-        cli_main.main()
-    except Exception as e:
+        # Click 데코레이터가 sys.argv를 자동으로 파싱하므로 직접 호출
+        audit()  # pylint: disable=no-value-for-parameter
+    except (ImportError, SystemExit, KeyboardInterrupt) as e:
+        # ImportError: 모듈 import 실패
+        # SystemExit: Click이 정상 종료
+        # KeyboardInterrupt: 사용자 중단
+        raise
+    except Exception as e:  # pylint: disable=broad-except
         print(f"❌ CLI 모드 실행 오류: {e}")
         print("다음 명령어로 직접 실행해보세요:")
         print("  python -m src.cli.main --path ./project --mode deployment")
@@ -63,6 +67,7 @@ def launch_ui():
         # Get app path
         if getattr(sys, 'frozen', False):
             # Running in PyInstaller bundle
+            # pylint: disable=protected-access
             app_path = os.path.join(sys._MEIPASS, "src", "ui", "app.py")
         else:
             # Running in normal Python
@@ -86,7 +91,17 @@ def launch_ui():
 
     except KeyboardInterrupt:
         print("\n\n✅ UI 모드를 종료합니다.")
-    except Exception as e:
+    except (ImportError, OSError, RuntimeError) as e:
+        # ImportError: streamlit 모듈 없음
+        # OSError: 파일 시스템 오류
+        # RuntimeError: Streamlit 실행 오류
+        print(f"❌ UI 모드 실행 오류: {e}")
+        print(f"오류 상세: {type(e).__name__}")
+        print("\n대안: 다음 명령어로 직접 실행해보세요:")
+        print("  python run_ui.py")
+        print("\n또는 소스코드로 실행:")
+        print("  python -m streamlit run src/ui/app.py")
+    except Exception as e:  # pylint: disable=broad-except
         print(f"❌ UI 모드 실행 오류: {e}")
         print(f"오류 상세: {type(e).__name__}")
         print("\n대안: 다음 명령어로 직접 실행해보세요:")

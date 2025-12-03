@@ -32,9 +32,9 @@ class CacheManager:
         """Create cache directory if it doesn't exist."""
         try:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Cache directory ensured at {self.cache_dir}")
-        except Exception as e:
-            logger.error(f"Failed to create cache directory: {e}", exc_info=True)
+            logger.debug("Cache directory ensured at %s", self.cache_dir)
+        except (OSError, PermissionError) as e:
+            logger.error("Failed to create cache directory: %s", e, exc_info=True)
 
     def _compute_file_hash(self, file_path: Path) -> str:
         """
@@ -52,8 +52,8 @@ class CacheManager:
                 for chunk in iter(lambda: f.read(8192), b''):
                     sha256.update(chunk)
             return sha256.hexdigest()
-        except Exception as e:
-            logger.debug(f"Failed to hash {file_path}: {e}")
+        except (IOError, OSError) as e:
+            logger.debug("Failed to hash %s: %s", file_path, e)
             return ""
 
     def _compute_project_hash(self, files: list[Path]) -> str:
@@ -72,8 +72,8 @@ class CacheManager:
                 # Include file path and modification time for quick check
                 stat = file_path.stat()
                 combined.append(f"{file_path}:{stat.st_mtime}:{stat.st_size}")
-            except Exception as e:
-                logger.debug(f"Failed to stat {file_path}: {e}")
+            except (OSError, PermissionError) as e:
+                logger.debug("Failed to stat %s: %s", file_path, e)
                 continue
 
         combined_str = '|'.join(combined)
@@ -93,13 +93,13 @@ class CacheManager:
         try:
             with open(self.cache_file, 'r', encoding='utf-8') as f:
                 cache_data = json.load(f)
-            logger.debug(f"Loaded cache with {len(cache_data)} entries")
+            logger.debug("Loaded cache with %d entries", len(cache_data))
             return cache_data
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse cache file: {e}", exc_info=True)
+            logger.error("Failed to parse cache file: %s", e, exc_info=True)
             return {}
-        except Exception as e:
-            logger.error(f"Failed to load cache: {e}", exc_info=True)
+        except (IOError, OSError) as e:
+            logger.error("Failed to load cache: %s", e, exc_info=True)
             return {}
 
     def _save_cache(self, cache_data: Dict[str, Any]) -> None:
@@ -112,9 +112,9 @@ class CacheManager:
         try:
             with open(self.cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f, indent=2, ensure_ascii=False)
-            logger.debug(f"Saved cache with {len(cache_data)} entries")
-        except Exception as e:
-            logger.error(f"Failed to save cache: {e}", exc_info=True)
+            logger.debug("Saved cache with %d entries", len(cache_data))
+        except (IOError, OSError, PermissionError) as e:
+            logger.error("Failed to save cache: %s", e, exc_info=True)
             raise
 
     def get_cached_result(
@@ -135,7 +135,7 @@ class CacheManager:
         cache_data = self._load_cache()
 
         if cache_key not in cache_data:
-            logger.debug(f"Cache miss: {cache_key}")
+            logger.debug("Cache miss: %s", cache_key)
             return None
 
         entry = cache_data[cache_key]
@@ -143,7 +143,7 @@ class CacheManager:
         # Check TTL
         cached_time = datetime.fromisoformat(entry['timestamp'])
         if datetime.now() - cached_time > self.cache_ttl:
-            logger.debug(f"Cache expired: {cache_key}")
+            logger.debug("Cache expired: %s", cache_key)
             return None
 
         # Check if project files changed
@@ -152,10 +152,10 @@ class CacheManager:
             cached_hash = entry.get('project_hash', '')
 
             if current_hash != cached_hash:
-                logger.debug(f"Cache invalidated (files changed): {cache_key}")
+                logger.debug("Cache invalidated (files changed): %s", cache_key)
                 return None
 
-        logger.info(f"Cache hit: {cache_key}")
+        logger.info("Cache hit: %s", cache_key)
         return entry.get('result')
 
     def save_result(
@@ -172,7 +172,7 @@ class CacheManager:
             result: Analysis result to cache
             project_files: List of project files (for invalidation)
         """
-        logger.debug(f"Saving result to cache: {cache_key}")
+        logger.debug("Saving result to cache: %s", cache_key)
 
         cache_data = self._load_cache()
 
@@ -187,7 +187,7 @@ class CacheManager:
         cache_data[cache_key] = entry
         self._save_cache(cache_data)
 
-        logger.info(f"Result cached: {cache_key}")
+        logger.info("Result cached: %s", cache_key)
 
     def invalidate(self, cache_key: Optional[str] = None) -> None:
         """
@@ -203,16 +203,16 @@ class CacheManager:
                     self.cache_file.unlink()
                     logger.info("Cache cleared")
             except Exception as e:
-                logger.error(f"Failed to clear cache: {e}", exc_info=True)
+                logger.error("Failed to clear cache: %s", e, exc_info=True)
                 raise
         else:
-            logger.info(f"Invalidating cache: {cache_key}")
+            logger.info("Invalidating cache: %s", cache_key)
             cache_data = self._load_cache()
 
             if cache_key in cache_data:
                 del cache_data[cache_key]
                 self._save_cache(cache_data)
-                logger.info(f"Cache invalidated: {cache_key}")
+                logger.info("Cache invalidated: %s", cache_key)
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """
@@ -268,6 +268,6 @@ class CacheManager:
             self._save_cache(cache_data)
 
         removed_count = len(expired_keys)
-        logger.info(f"Removed {removed_count} expired cache entries")
+        logger.info("Removed %d expired cache entries", removed_count)
 
         return removed_count

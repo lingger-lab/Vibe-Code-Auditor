@@ -47,7 +47,7 @@ class HistoryTracker:
             static_results: Static analysis results
             ai_results: AI analysis results (optional)
         """
-        logger.info(f"Saving analysis result to history")
+        logger.info("Saving analysis result to history")
 
         # Load existing history
         history = self._load_history()
@@ -73,7 +73,7 @@ class HistoryTracker:
         # Save to file
         self._save_history(history)
 
-        logger.info(f"Analysis result saved to history (total entries: {len(history)})")
+        logger.info("Analysis result saved to history (total entries: %d)", len(history))
 
     def _aggregate_severity(
         self,
@@ -113,13 +113,13 @@ class HistoryTracker:
         try:
             with open(self.history_file, 'r', encoding='utf-8') as f:
                 history = json.load(f)
-            logger.debug(f"Loaded {len(history)} history entries")
+            logger.debug("Loaded %d history entries", len(history))
             return history
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse history file: {e}", exc_info=True)
+            logger.error("Failed to parse history file: %s", e, exc_info=True)
             return []
-        except Exception as e:
-            logger.error(f"Failed to load history: {e}", exc_info=True)
+        except (IOError, OSError) as e:
+            logger.error("Failed to load history: %s", e, exc_info=True)
             return []
 
     def _save_history(self, history: List[Dict[str, Any]]) -> None:
@@ -132,9 +132,9 @@ class HistoryTracker:
         try:
             with open(self.history_file, 'w', encoding='utf-8') as f:
                 json.dump(history, f, indent=2, ensure_ascii=False)
-            logger.debug(f"Saved {len(history)} history entries")
-        except Exception as e:
-            logger.error(f"Failed to save history: {e}", exc_info=True)
+            logger.debug("Saved %d history entries", len(history))
+        except (IOError, OSError, PermissionError) as e:
+            logger.error("Failed to save history: %s", e, exc_info=True)
             raise
 
     def get_history(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -219,8 +219,8 @@ class HistoryTracker:
             if self.history_file.exists():
                 self.history_file.unlink()
                 logger.info("History data cleared")
-        except Exception as e:
-            logger.error(f"Failed to clear history: {e}", exc_info=True)
+        except (OSError, PermissionError) as e:
+            logger.error("Failed to clear history: %s", e, exc_info=True)
             raise
 
     def export_history(self, output_path: Path) -> None:
@@ -230,7 +230,7 @@ class HistoryTracker:
         Args:
             output_path: Path to save exported history
         """
-        logger.info(f"Exporting history to {output_path}")
+        logger.info("Exporting history to %s", output_path)
 
         history = self._load_history()
         trend_data = self.get_trend_data()
@@ -247,7 +247,7 @@ class HistoryTracker:
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(export_data, f, indent=2, ensure_ascii=False)
 
-            logger.info(f"History exported to {output_path}")
-        except Exception as e:
-            logger.error(f"Failed to export history: {e}", exc_info=True)
+            logger.info("History exported to %s", output_path)
+        except (IOError, OSError, PermissionError) as e:
+            logger.error("Failed to export history: %s", e, exc_info=True)
             raise

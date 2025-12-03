@@ -1,8 +1,8 @@
 {
   "metadata": {
     "tool": "Vibe-Code Auditor",
-    "version": "1.1.0",
-    "timestamp": "2025-12-01T09:38:53.217644",
+    "version": "1.10.0",
+    "timestamp": "2025-12-03T13:58:23.507784",
     "project_path": "examples\\test-project",
     "analysis_mode": "deployment"
   },
@@ -25,20 +25,20 @@
       {
         "tool": "pylint",
         "file": "examples\\test-project\\sample.py",
-        "line": 3,
-        "severity": "info",
-        "message": "Missing function or method docstring",
-        "symbol": "missing-function-docstring",
-        "message_id": "C0116"
-      },
-      {
-        "tool": "pylint",
-        "file": "examples\\test-project\\sample.py",
         "line": 11,
         "severity": "warning",
         "message": "Unnecessary pass statement",
         "symbol": "unnecessary-pass",
         "message_id": "W0107"
+      },
+      {
+        "tool": "pylint",
+        "file": "examples\\test-project\\sample.py",
+        "line": 3,
+        "severity": "info",
+        "message": "Missing function or method docstring",
+        "symbol": "missing-function-docstring",
+        "message_id": "C0116"
       },
       {
         "tool": "pylint",

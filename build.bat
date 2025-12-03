@@ -5,7 +5,7 @@ REM Automated executable build with PyInstaller
 REM ====================================================================
 
 echo ============================================================
-echo   Vibe-Code Auditor v1.9.0 - Build Script
+echo   Vibe-Code Auditor v1.10.0 - Build Script
 echo   Creating standalone Windows executable
 echo ============================================================
 echo.

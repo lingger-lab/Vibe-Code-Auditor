@@ -15,6 +15,9 @@ from reportlab.platypus import (
     PageBreak, Image
 )
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from io import BytesIO
 
 
 class PDFReporter:
@@ -29,7 +32,26 @@ class PDFReporter:
         """
         self.mode = mode
         self.styles = getSampleStyleSheet()
+        self._register_korean_font()
         self._setup_custom_styles()
+
+    def _register_korean_font(self) -> None:
+        """
+        Register a font that supports Korean characters.
+
+        On Windows, we try to use 'Malgun Gothic' which is installed by default.
+        """
+        try:
+            # Windows 기본 한글 폰트 경로
+            malgun_path = r"C:\Windows\Fonts\malgun.ttf"
+            pdfmetrics.registerFont(TTFont("MalgunGothic", malgun_path))
+            self.base_font_name = "MalgunGothic"
+        except Exception:
+            # 폰트 등록에 실패하면 기본 폰트 사용 (한글은 깨져 보일 수 있음)
+            self.base_font_name = self.styles["Normal"].fontName
+
+        # 기본 Normal 스타일에도 한글 폰트를 적용해, 별도 스타일을 쓰지 않는 본문도 깨지지 않게 함
+        self.styles["Normal"].fontName = self.base_font_name
 
     def _setup_custom_styles(self):
         """Setup custom paragraph styles"""
@@ -38,6 +60,7 @@ class PDFReporter:
             name='CustomTitle',
             parent=self.styles['Heading1'],
             fontSize=24,
+            fontName=self.base_font_name,
             textColor=colors.HexColor('#1f77b4'),
             spaceAfter=30,
             alignment=TA_CENTER
@@ -48,6 +71,7 @@ class PDFReporter:
             name='SectionHeader',
             parent=self.styles['Heading2'],
             fontSize=16,
+            fontName=self.base_font_name,
             textColor=colors.HexColor('#2ca02c'),
             spaceAfter=12,
             spaceBefore=12
@@ -58,6 +82,7 @@ class PDFReporter:
             name='IssueTitle',
             parent=self.styles['Heading3'],
             fontSize=12,
+            fontName=self.base_font_name,
             textColor=colors.HexColor('#d62728'),
             spaceAfter=6
         ))
@@ -111,6 +136,65 @@ class PDFReporter:
         # Build PDF
         doc.build(story)
 
+    def generate_report_to_bytes(
+        self,
+        results: Dict[str, Any],
+        project_path: Path
+    ) -> bytes:
+        """
+        Generate PDF report to memory (BytesIO).
+
+        Args:
+            results: Analysis results dictionary
+            project_path: Path to analyzed project
+
+        Returns:
+            PDF content as bytes
+        """
+        # Create BytesIO buffer
+        buffer = BytesIO()
+
+        # Create document in memory
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=18
+        )
+
+        # Build content
+        story = []
+
+        # Title page
+        story.extend(self._build_title_page(project_path))
+
+        # Summary section
+        story.extend(self._build_summary_section(results))
+
+        # Language detection section
+        story.extend(self._build_language_section(results.get('languages', [])))
+
+        # Static analysis section
+        static_results = results.get('static_results', {})
+        if static_results:
+            story.extend(self._build_static_analysis_section(static_results))
+
+        # AI analysis section
+        ai_results = results.get('ai_results')
+        if ai_results:
+            story.extend(self._build_ai_analysis_section(ai_results))
+
+        # Build PDF
+        doc.build(story)
+
+        # Get PDF bytes
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+
+        return pdf_bytes
+
     def _build_title_page(self, project_path: Path) -> List:
         """Build title page"""
         story = []
@@ -128,13 +212,13 @@ class PDFReporter:
             ['Project Path:', str(project_path)],
             ['Analysis Mode:', self.mode.capitalize()],
             ['Report Date:', datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
-            ['Tool Version:', 'v1.9.0']
+            ['Tool Version:', 'v1.10.0']
         ]
 
         table = Table(metadata, colWidths=[2 * inch, 4.5 * inch])
         table.setStyle(TableStyle([
-            ('FONT', (0, 0), (-1, -1), 'Helvetica', 10),
-            ('FONT', (0, 0), (0, -1), 'Helvetica-Bold', 10),
+            ('FONT', (0, 0), (-1, -1), self.base_font_name, 10),
+            ('FONT', (0, 0), (0, -1), self.base_font_name, 10),
             ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#1f77b4')),
             ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
             ('ALIGN', (1, 0), (1, -1), 'LEFT'),
@@ -156,13 +240,37 @@ class PDFReporter:
         story.append(header)
 
         # Calculate statistics
+        # JSON 리포터와 일관성을 맞추기 위해 정적 분석 + AI 분석 요약을 함께 사용
         static_results = results.get('static_results', {})
-        issues = static_results.get('issues', [])
+        ai_results = results.get('ai_results')
 
-        critical_count = sum(1 for i in issues if i.get('severity') == 'critical')
-        warning_count = sum(1 for i in issues if i.get('severity') == 'warning')
-        info_count = sum(1 for i in issues if i.get('severity') == 'info')
-        total_issues = len(issues)
+        static_summary = static_results.get('summary', {})
+        static_by_severity = static_summary.get('by_severity', {})
+
+        # static 기준 값
+        static_total = static_summary.get('total_issues', len(static_results.get('issues', [])))
+        static_critical = static_by_severity.get('critical', 0)
+        static_warning = static_by_severity.get('warning', 0)
+        static_info = static_by_severity.get('info', 0)
+
+        # AI 기준 값
+        ai_total = 0
+        ai_critical = 0
+        ai_warning = 0
+        ai_info = 0
+
+        if ai_results and 'summary' in ai_results:
+            ai_summary = ai_results['summary']
+            ai_total = ai_summary.get('total_issues', 0)
+            ai_by_severity = ai_summary.get('by_severity', {})
+            ai_critical = ai_by_severity.get('critical', 0)
+            ai_warning = ai_by_severity.get('warning', 0)
+            ai_info = ai_by_severity.get('info', 0)
+
+        total_issues = static_total + ai_total
+        critical_count = static_critical + ai_critical
+        warning_count = static_warning + ai_warning
+        info_count = static_info + ai_info
 
         languages = results.get('languages', [])
         language_count = len(languages)
@@ -171,7 +279,7 @@ class PDFReporter:
         summary_data = [
             ['Metric', 'Count'],
             ['Languages Detected', str(language_count)],
-            ['Total Issues Found', str(total_issues)],
+            ['Total Issues (Static + AI)', str(total_issues)],
             ['Critical Issues', str(critical_count)],
             ['Warnings', str(warning_count)],
             ['Informational', str(info_count)]
@@ -182,10 +290,10 @@ class PDFReporter:
             # Header row
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f77b4')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 12),
+            ('FONT', (0, 0), (-1, 0), self.base_font_name, 12),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             # Data rows
-            ('FONT', (0, 1), (-1, -1), 'Helvetica', 10),
+            ('FONT', (0, 1), (-1, -1), self.base_font_name, 10),
             ('ALIGN', (1, 1), (1, -1), 'CENTER'),
             ('GRID', (0, 0), (-1, -1), 1, colors.grey),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f0f0')])
@@ -237,27 +345,27 @@ class PDFReporter:
         warning_issues = [i for i in issues if i.get('severity') == 'warning']
         info_issues = [i for i in issues if i.get('severity') == 'info']
 
-        # Critical issues
+        # Critical issues (최대 20개까지 상세 표시)
         if critical_issues:
             story.append(Paragraph(
                 f"Critical Issues ({len(critical_issues)})",
                 self.styles['IssueTitle']
             ))
-            story.extend(self._build_issue_table(critical_issues[:10]))  # Limit to 10
-            if len(critical_issues) > 10:
+            story.extend(self._build_issue_table(critical_issues[:20]))
+            if len(critical_issues) > 20:
                 story.append(Paragraph(
-                    f"<i>... and {len(critical_issues) - 10} more critical issues</i>",
+                    f"<i>... and {len(critical_issues) - 20} more critical issues</i>",
                     self.styles['Normal']
                 ))
             story.append(Spacer(1, 0.2 * inch))
 
-        # Warnings
+        # Warnings (최대 10개까지 상세 표시)
         if warning_issues:
             story.append(Paragraph(
                 f"Warnings ({len(warning_issues)})",
                 self.styles['IssueTitle']
             ))
-            story.extend(self._build_issue_table(warning_issues[:10]))  # Limit to 10
+            story.extend(self._build_issue_table(warning_issues[:10]))
             if len(warning_issues) > 10:
                 story.append(Paragraph(
                     f"<i>... and {len(warning_issues) - 10} more warnings</i>",
@@ -265,16 +373,16 @@ class PDFReporter:
                 ))
             story.append(Spacer(1, 0.2 * inch))
 
-        # Info issues
+        # Info issues (최대 5개까지 상세 표시)
         if info_issues:
             story.append(Paragraph(
                 f"Informational ({len(info_issues)})",
                 self.styles['IssueTitle']
             ))
-            story.extend(self._build_issue_table(info_issues[:10]))  # Limit to 10
-            if len(info_issues) > 10:
+            story.extend(self._build_issue_table(info_issues[:5]))
+            if len(info_issues) > 5:
                 story.append(Paragraph(
-                    f"<i>... and {len(info_issues) - 10} more informational issues</i>",
+                    f"<i>... and {len(info_issues) - 5} more informational issues</i>",
                     self.styles['Normal']
                 ))
 
@@ -314,9 +422,9 @@ class PDFReporter:
             # Header
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2ca02c')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9),
+            ('FONT', (0, 0), (-1, 0), self.base_font_name, 9),
             # Data
-            ('FONT', (0, 1), (-1, -1), 'Helvetica', 8),
+            ('FONT', (0, 1), (-1, -1), self.base_font_name, 8),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9f9f9')]),
             ('VALIGN', (0, 0), (-1, -1), 'TOP')
@@ -343,38 +451,100 @@ class PDFReporter:
                 self.styles['IssueTitle']
             ))
 
-            for i, issue in enumerate(issues[:5], 1):  # Limit to 5
-                severity = issue.get('severity', 'info').upper()
-                message = issue.get('issue', 'No description')
+            # 심각도별 그룹핑 (HTML/JSON, UI와 동일한 구조)
+            issues_by_severity = {
+                'critical': [],
+                'warning': [],
+                'info': []
+            }
 
-                issue_text = f"<b>{i}. [{severity}]</b> {message}"
-                para = Paragraph(issue_text, self.styles['Normal'])
-                story.append(para)
-                story.append(Spacer(1, 0.1 * inch))
+            for issue in issues:
+                severity = issue.get('severity', 'info').lower()
+                if severity in issues_by_severity:
+                    issues_by_severity[severity].append(issue)
+                else:
+                    issues_by_severity['info'].append(issue)
 
-            if len(issues) > 5:
+            severity_order = ['critical', 'warning', 'info']
+
+            for severity in severity_order:
+                severity_issues = issues_by_severity[severity]
+                if not severity_issues:
+                    continue
+
+                # Severity 섹션 헤더
+                severity_title = {
+                    'critical': 'Critical',
+                    'warning': 'Warning',
+                    'info': 'Info'
+                }.get(severity, severity.upper())
+
+                story.append(Spacer(1, 0.15 * inch))
                 story.append(Paragraph(
-                    f"<i>... and {len(issues) - 5} more AI-detected issues</i>",
-                    self.styles['Normal']
+                    f"{severity_title} Issues ({len(severity_issues)})",
+                    self.styles['IssueTitle']
                 ))
 
-        # Recommendations
-        recommendations = ai_results.get('recommendations', [])
-        if recommendations:
-            story.append(Spacer(1, 0.2 * inch))
-            story.append(Paragraph("Recommendations", self.styles['IssueTitle']))
+                # 심각도별 상세 표시 개수 제한: critical=20, warning=10, info=5
+                if severity == 'critical':
+                    max_items = 20
+                elif severity == 'warning':
+                    max_items = 10
+                else:
+                    max_items = 5
 
-            for i, rec in enumerate(recommendations[:5], 1):  # Limit to 5
-                rec_text = f"{i}. {rec}"
-                para = Paragraph(rec_text, self.styles['Normal'])
-                story.append(para)
-                story.append(Spacer(1, 0.1 * inch))
+                # 각 섹션당 최대 N개만 상세 표시
+                for i, issue in enumerate(severity_issues[:max_items], 1):
+                    raw_title = (issue.get('title') or 'No title')
+                    details = issue.get('details', []) or []
 
-            if len(recommendations) > 5:
-                story.append(Paragraph(
-                    f"<i>... and {len(recommendations) - 5} more recommendations</i>",
-                    self.styles['Normal']
-                ))
+                    # Markdown 표(| ... |), 코드펜스(```), 언어 태그만 있는 줄 제거
+                    filtered_details: List[str] = []
+                    for line in details:
+                        stripped = line.strip()
+                        if not stripped:
+                            continue
+                        if stripped.startswith('|'):
+                            continue
+                        if stripped.startswith('```'):
+                            continue
+                        if stripped in {'python', 'bash', 'sh', 'json', 'yaml'}:
+                            continue
+                        filtered_details.append(line)
+
+                    # 제목이 표/마스킹이고 실제 설명 줄이 있을 때만 첫 번째 줄을 제목으로 승격
+                    promote_to_detail_title = (
+                        (raw_title.strip().startswith('|') or raw_title.replace('■', '').strip() == '')
+                        and bool(filtered_details)
+                    )
+
+                    if promote_to_detail_title:
+                        title = filtered_details[0][:80]
+                        body_lines = filtered_details[1:]
+                    else:
+                        if raw_title.strip().startswith('|') or raw_title.replace('■', '').strip() == '':
+                            title = 'AI 분석 이슈'
+                        else:
+                            title = raw_title
+                        body_lines = filtered_details
+
+                    details_text = "<br/>".join(body_lines) if body_lines else ""
+                    issue_text = f"<b>{i}. {title}</b>"
+                    if details_text:
+                        issue_text = issue_text + f"<br/>{details_text}"
+
+                    para = Paragraph(issue_text, self.styles['Normal'])
+                    story.append(para)
+                    story.append(Spacer(1, 0.1 * inch))
+
+                if len(severity_issues) > max_items:
+                    story.append(Paragraph(
+                        f"<i>... and {len(severity_issues) - max_items} more {severity_title.lower()} issues</i>",
+                        self.styles['Normal']
+                    ))
+
+        # 현재 ai_results에는 recommendations 필드가 없으므로,
+        # 향후 확장을 위해 구조만 남겨두고 기본적으로는 사용하지 않습니다.
 
         story.append(Spacer(1, 0.3 * inch))
 

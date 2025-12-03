@@ -2,7 +2,7 @@
 
 **바이브코딩으로 개발한 프로젝트를 AI + 정적 분석 도구로 자동 점검하는 멀티 인터페이스 코드 감사 플랫폼**
 
-[![Version](https://img.shields.io/badge/version-1.9.0-blue.svg)](https://github.com/lingger-lab/Vibe-Code-Auditor)
+[![Version](https://img.shields.io/badge/version-1.10.0-blue.svg)](https://github.com/lingger-lab/Vibe-Code-Auditor)
 [![Python](https://img.shields.io/badge/python-3.11+-green.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 
@@ -18,7 +18,7 @@
 - 💾 **결과 캐싱**: 99% 속도 향상 (변경되지 않은 파일 재분석 방지)
 - 📈 **히스토리 추적**: 분석 결과 추이 관리 및 트렌드 분석
 
-### ✨ v1.9.0 새로운 기능
+### ✨ v1.10.0 새로운 기능
 - 📦 **실행 파일 배포**: PyInstaller 기반 독립 실행형 .exe (설치 불필요)
 - 📄 **PDF 리포트**: 전문적인 PDF 형식 분석 보고서 생성
 - 🔄 **비교 모드**: 두 분석 결과 비교 및 품질 개선 추적

@@ -53,5 +53,9 @@ htmlcov/
 .pylint.d/
 jscpd-report/
 
+# Vibe Auditor runtime data
+.vibe-auditor-cache/
+.vibe-auditor-history/
+
 # OS
 Thumbs.db

@@ -46,7 +46,7 @@ class JSONReporter:
         report = {
             "metadata": {
                 "tool": "Vibe-Code Auditor",
-                "version": "1.1.0",
+                "version": "1.10.0",
                 "timestamp": datetime.now().isoformat(),
                 "project_path": str(project_path),
                 "analysis_mode": self.mode
@@ -60,7 +60,7 @@ class JSONReporter:
         if output_file:
             self._save_to_file(report, output_file)
 
-        logger.info(f"JSON report generated with {report['summary']['total_issues']} total issues")
+        logger.info("JSON report generated with %d total issues", report['summary']['total_issues'])
         return report
 
     def _generate_summary(
@@ -93,22 +93,62 @@ class JSONReporter:
         }
 
     def _format_static_results(self, static_results: Dict[str, Any]) -> Dict[str, Any]:
-        """Format static analysis results."""
+        """Format static analysis results with priority sorting."""
+        issues = static_results.get('issues', [])
+        
+        # 우선순위별로 이슈 정렬: critical -> warning -> info
+        sorted_issues = self._sort_issues_by_priority(issues)
+        
         return {
             "mode": static_results.get('mode'),
             "languages": static_results.get('languages', []),
-            "issues": static_results.get('issues', []),
+            "issues": sorted_issues,
             "summary": static_results.get('summary', {})
         }
 
     def _format_ai_results(self, ai_results: Dict[str, Any]) -> Dict[str, Any]:
-        """Format AI analysis results."""
+        """Format AI analysis results with priority sorting."""
+        issues = ai_results.get('issues', [])
+        
+        # 우선순위별로 이슈 정렬: critical -> warning -> info
+        sorted_issues = self._sort_issues_by_priority(issues)
+        
         return {
             "mode": ai_results.get('mode'),
-            "issues": ai_results.get('issues', []),
+            "issues": sorted_issues,
             "summary": ai_results.get('summary', {}),
             "error": ai_results.get('error')
         }
+
+    def _sort_issues_by_priority(self, issues: list) -> list:
+        """
+        Sort issues by priority: critical -> warning -> info.
+        
+        Args:
+            issues: List of issue dictionaries
+            
+        Returns:
+            Sorted list of issues by priority
+        """
+        if not issues:
+            return []
+        
+        # 우선순위 매핑 (낮은 숫자가 높은 우선순위)
+        priority_map = {
+            'critical': 1,
+            'warning': 2,
+            'info': 3
+        }
+        
+        def get_priority(issue: Dict[str, Any]) -> int:
+            """Get priority value for an issue."""
+            severity = issue.get('severity', 'info').lower()
+            return priority_map.get(severity, 3)  # 기본값은 info
+        
+        # 우선순위별로 정렬
+        sorted_issues = sorted(issues, key=get_priority)
+        
+        return sorted_issues
 
     def _save_to_file(self, report: Dict[str, Any], output_file: Path) -> None:
         """
@@ -124,8 +164,8 @@ class JSONReporter:
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(report, f, indent=2, ensure_ascii=False)
 
-            logger.info(f"JSON report saved to {output_file}")
+            logger.info("JSON report saved to %s", output_file)
 
-        except Exception as e:
-            logger.error(f"Failed to save JSON report: {e}", exc_info=True)
+        except (IOError, OSError, PermissionError) as e:
+            logger.error("Failed to save JSON report: %s", e, exc_info=True)
             raise

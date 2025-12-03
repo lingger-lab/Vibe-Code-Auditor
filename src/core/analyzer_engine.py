@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, Callable, List
 import logging
 
-from src.config.settings import ANTHROPIC_API_KEY
+from src.config.settings import ANTHROPIC_API_KEY, validate_api_key
 from src.detectors.language_detector import LanguageDetector
 from src.analyzers.static_analyzer import StaticAnalyzer
 from src.analyzers.ai_analyzer import AIAnalyzer
@@ -76,7 +76,7 @@ class AnalyzerEngine:
 
         self._progress = AnalysisProgress()
 
-        logger.debug(f"AnalyzerEngine initialized: path={project_path}, mode={mode}, skip_ai={skip_ai}")
+        logger.debug("AnalyzerEngine initialized: path=%s, mode=%s, skip_ai=%s", project_path, mode, skip_ai)
 
     def _update_progress(
         self,
@@ -104,8 +104,8 @@ class AnalyzerEngine:
         if self.progress_callback:
             try:
                 self.progress_callback(self._progress)
-            except Exception as e:
-                logger.warning(f"Progress callback failed: {e}")
+            except Exception as e:  # pylint: disable=broad-except
+                logger.warning("Progress callback failed: %s", e)
 
     def validate_requirements(self) -> tuple[bool, Optional[str]]:
         """
@@ -122,8 +122,10 @@ class AnalyzerEngine:
             return False, f"Project path is not a directory: {self.project_path}"
 
         # Check API key if AI analysis is requested
-        if not self.skip_ai and not ANTHROPIC_API_KEY:
-            return False, "ANTHROPIC_API_KEY is not set. Either set the API key or use skip_ai=True"
+        if not self.skip_ai:
+            is_valid_key, key_error = validate_api_key()
+            if not is_valid_key:
+                return False, key_error
 
         return True, None
 
@@ -169,7 +171,7 @@ class AnalyzerEngine:
                     self.progress_callback(self._progress)
                 raise RuntimeError(error_msg)
 
-            logger.info(f"Detected languages: {languages}")
+            logger.info("Detected languages: %s", languages)
             self._update_progress(
                 "detection",
                 f"Detected {len(languages)} language(s)",
@@ -189,7 +191,7 @@ class AnalyzerEngine:
             )
             static_results = static_analyzer.analyze()
 
-            logger.info(f"Static analysis completed: {len(static_results.get('issues', []))} issues found")
+            logger.info("Static analysis completed: %d issues found", len(static_results.get('issues', [])))
             self._update_progress(
                 "static_analysis",
                 "Static analysis completed",
@@ -224,8 +226,8 @@ class AnalyzerEngine:
                     history_tracker = HistoryTracker(self.project_path)
                     history_tracker.save_result(self.mode, static_results, ai_results)
                     logger.debug("Analysis result saved to history")
-                except Exception as e:
-                    logger.warning(f"Failed to save history: {e}")
+                except Exception as e:  # pylint: disable=broad-except
+                    logger.warning("Failed to save history: %s", e)
                     # Don't fail the whole analysis just because history failed
 
             # Finalize
@@ -247,8 +249,8 @@ class AnalyzerEngine:
             logger.info("Analysis pipeline completed successfully")
             return result
 
-        except Exception as e:
-            logger.error(f"Analysis failed: {e}", exc_info=True)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Analysis failed: %s", e, exc_info=True)
             self._progress.error = str(e)
             self._progress.completed = True
             if self.progress_callback:

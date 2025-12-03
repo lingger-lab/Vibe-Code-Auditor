@@ -3,14 +3,10 @@
 import subprocess
 import json
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import shutil
 
-from src.config.settings import (
-    STATIC_ANALYSIS_TOOLS,
-    LANGUAGE_PATTERNS,
-    SEVERITY_LEVELS
-)
+from src.config.settings import STATIC_ANALYSIS_TOOLS
 from src.utils.logger import setup_logger
 from src.utils.cache_manager import CacheManager
 
@@ -79,7 +75,7 @@ class StaticAnalyzer:
             }]
 
         try:
-            logger.info(f"Running Pylint on {self.project_path}")
+            logger.info("Running Pylint on %s", self.project_path)
 
             # Run pylint with JSON output and improved error handling
             result = subprocess.run(
@@ -107,11 +103,11 @@ class StaticAnalyzer:
                             'message_id': item.get('message-id', '')
                         })
 
-                    logger.info(f"Pylint found {len(issues)} issues")
+                    logger.info("Pylint found %d issues", len(issues))
                     return issues
 
                 except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse Pylint JSON output: {e}")
+                    logger.error("Failed to parse Pylint JSON output: %s", e)
                     return [{
                         'tool': 'pylint',
                         'severity': 'warning',
@@ -119,7 +115,7 @@ class StaticAnalyzer:
                     }]
 
         except subprocess.TimeoutExpired:
-            logger.warning(f"Pylint timed out after 300 seconds for {self.project_path}")
+            logger.warning("Pylint timed out after 300 seconds for %s", self.project_path)
             return [{
                 'tool': 'pylint',
                 'severity': 'warning',
@@ -134,8 +130,8 @@ class StaticAnalyzer:
                 'message': 'Pylint is not installed or not in PATH',
                 'suggestion': STATIC_ANALYSIS_TOOLS['pylint']['install_hint']
             }]
-        except Exception as e:
-            logger.error(f"Pylint analysis failed with unexpected error: {e}", exc_info=True)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Pylint analysis failed with unexpected error: %s", e, exc_info=True)
             return [{
                 'tool': 'pylint',
                 'severity': 'warning',
@@ -160,7 +156,7 @@ class StaticAnalyzer:
             }]
 
         try:
-            logger.info(f"Running Semgrep security scan on {self.project_path}")
+            logger.info("Running Semgrep security scan on %s", self.project_path)
 
             # Run semgrep with auto config and improved error handling
             result = subprocess.run(
@@ -186,11 +182,11 @@ class StaticAnalyzer:
                             'rule_id': finding.get('check_id', '')
                         })
 
-                    logger.info(f"Semgrep found {len(issues)} security issues")
+                    logger.info("Semgrep found %d security issues", len(issues))
                     return issues
 
                 except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse Semgrep JSON output: {e}")
+                    logger.error("Failed to parse Semgrep JSON output: %s", e)
                     return [{
                         'tool': 'semgrep',
                         'severity': 'warning',
@@ -198,7 +194,7 @@ class StaticAnalyzer:
                     }]
 
         except subprocess.TimeoutExpired:
-            logger.warning(f"Semgrep timed out after 300 seconds for {self.project_path}")
+            logger.warning("Semgrep timed out after 300 seconds for %s", self.project_path)
             return [{
                 'tool': 'semgrep',
                 'severity': 'warning',
@@ -213,8 +209,8 @@ class StaticAnalyzer:
                 'message': 'Semgrep is not installed (not available on Windows natively)',
                 'suggestion': STATIC_ANALYSIS_TOOLS['semgrep']['install_hint']
             }]
-        except Exception as e:
-            logger.error(f"Semgrep analysis failed with unexpected error: {e}", exc_info=True)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Semgrep analysis failed with unexpected error: %s", e, exc_info=True)
             return [{
                 'tool': 'semgrep',
                 'severity': 'warning',
@@ -239,7 +235,7 @@ class StaticAnalyzer:
             }]
 
         try:
-            logger.info(f"Running jscpd code duplication detection on {self.project_path}")
+            logger.info("Running jscpd code duplication detection on %s", self.project_path)
 
             # Run jscpd with JSON output and improved error handling
             result = subprocess.run(
@@ -263,7 +259,7 @@ class StaticAnalyzer:
                             'duplicates_count': len(duplicates),
                             'statistics': jscpd_output.get('statistics', {})
                         }]
-                        logger.info(f"jscpd found {len(duplicates)} code duplications")
+                        logger.info("jscpd found %d code duplications", len(duplicates))
                         return issues
                     else:
                         logger.info("jscpd found no code duplications")
@@ -274,7 +270,7 @@ class StaticAnalyzer:
                     pass
 
         except subprocess.TimeoutExpired:
-            logger.warning(f"jscpd timed out after 180 seconds for {self.project_path}")
+            logger.warning("jscpd timed out after 180 seconds for %s", self.project_path)
             return [{
                 'tool': 'jscpd',
                 'severity': 'info',
@@ -289,8 +285,8 @@ class StaticAnalyzer:
                 'message': 'jscpd is not installed',
                 'suggestion': STATIC_ANALYSIS_TOOLS['jscpd']['install_hint']
             }]
-        except Exception as e:
-            logger.error(f"jscpd analysis failed with unexpected error: {e}", exc_info=True)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("jscpd analysis failed with unexpected error: %s", e, exc_info=True)
             return [{
                 'tool': 'jscpd',
                 'severity': 'info',
@@ -315,7 +311,7 @@ class StaticAnalyzer:
             }]
 
         try:
-            logger.info(f"Running staticcheck on Go code in {self.project_path}")
+            logger.info("Running staticcheck on Go code in %s", self.project_path)
 
             result = subprocess.run(
                 ['staticcheck', '-f', 'json', './...'],
@@ -341,7 +337,7 @@ class StaticAnalyzer:
                                 'code': item.get('code', '')
                             })
 
-                    logger.info(f"staticcheck found {len(issues)} issues")
+                    logger.info("staticcheck found %d issues", len(issues))
                     return issues
 
                 except json.JSONDecodeError:
@@ -352,8 +348,8 @@ class StaticAnalyzer:
             return [{'tool': 'staticcheck', 'severity': 'warning', 'message': 'Analysis timed out'}]
         except FileNotFoundError:
             return [{'tool': 'staticcheck', 'severity': 'info', 'message': 'staticcheck not found'}]
-        except Exception as e:
-            logger.error(f"staticcheck failed: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("staticcheck failed: %s", e)
             return [{'tool': 'staticcheck', 'severity': 'warning', 'message': f'Analysis failed: {str(e)}'}]
 
         return []
@@ -374,7 +370,7 @@ class StaticAnalyzer:
             }]
 
         try:
-            logger.info(f"Running cargo clippy on Rust code in {self.project_path}")
+            logger.info("Running cargo clippy on Rust code in %s", self.project_path)
 
             result = subprocess.run(
                 ['cargo', 'clippy', '--message-format=json', '--', '-D', 'warnings'],
@@ -409,10 +405,10 @@ class StaticAnalyzer:
                             except json.JSONDecodeError:
                                 continue
 
-                    logger.info(f"clippy found {len(issues)} issues")
+                    logger.info("clippy found %d issues", len(issues))
                     return issues
 
-                except Exception:
+                except (ValueError, KeyError, IndexError):  # JSON 파싱 오류 등
                     return []
 
         except subprocess.TimeoutExpired:
@@ -420,8 +416,8 @@ class StaticAnalyzer:
             return [{'tool': 'clippy', 'severity': 'warning', 'message': 'Analysis timed out'}]
         except FileNotFoundError:
             return [{'tool': 'clippy', 'severity': 'info', 'message': 'cargo/clippy not found'}]
-        except Exception as e:
-            logger.error(f"clippy failed: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("clippy failed: %s", e)
             return [{'tool': 'clippy', 'severity': 'warning', 'message': f'Analysis failed: {str(e)}'}]
 
         return []
@@ -442,7 +438,7 @@ class StaticAnalyzer:
             }]
 
         try:
-            logger.info(f"Running PHPStan on PHP code in {self.project_path}")
+            logger.info("Running PHPStan on PHP code in %s", self.project_path)
 
             result = subprocess.run(
                 ['phpstan', 'analyse', '--error-format=json', '.'],
@@ -468,7 +464,7 @@ class StaticAnalyzer:
                                 'message': error.get('message', '')
                             })
 
-                    logger.info(f"PHPStan found {len(issues)} issues")
+                    logger.info("PHPStan found %d issues", len(issues))
                     return issues
 
                 except json.JSONDecodeError:
@@ -479,8 +475,8 @@ class StaticAnalyzer:
             return [{'tool': 'phpstan', 'severity': 'warning', 'message': 'Analysis timed out'}]
         except FileNotFoundError:
             return [{'tool': 'phpstan', 'severity': 'info', 'message': 'PHPStan not found'}]
-        except Exception as e:
-            logger.error(f"PHPStan failed: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("PHPStan failed: %s", e)
             return [{'tool': 'phpstan', 'severity': 'warning', 'message': f'Analysis failed: {str(e)}'}]
 
         return []
@@ -501,7 +497,7 @@ class StaticAnalyzer:
             }]
 
         try:
-            logger.info(f"Running RuboCop on Ruby code in {self.project_path}")
+            logger.info("Running RuboCop on Ruby code in %s", self.project_path)
 
             result = subprocess.run(
                 ['rubocop', '--format', 'json', '.'],
@@ -529,7 +525,7 @@ class StaticAnalyzer:
                                 'cop_name': offense.get('cop_name', '')
                             })
 
-                    logger.info(f"RuboCop found {len(issues)} issues")
+                    logger.info("RuboCop found %d issues", len(issues))
                     return issues
 
                 except json.JSONDecodeError:
@@ -540,8 +536,8 @@ class StaticAnalyzer:
             return [{'tool': 'rubocop', 'severity': 'warning', 'message': 'Analysis timed out'}]
         except FileNotFoundError:
             return [{'tool': 'rubocop', 'severity': 'info', 'message': 'RuboCop not found'}]
-        except Exception as e:
-            logger.error(f"RuboCop failed: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("RuboCop failed: %s", e)
             return [{'tool': 'rubocop', 'severity': 'warning', 'message': f'Analysis failed: {str(e)}'}]
 
         return []
@@ -562,7 +558,7 @@ class StaticAnalyzer:
             }]
 
         try:
-            logger.info(f"Running ktlint on Kotlin code in {self.project_path}")
+            logger.info("Running ktlint on Kotlin code in %s", self.project_path)
 
             result = subprocess.run(
                 ['ktlint', '--reporter=json', '**/*.kt'],
@@ -590,7 +586,7 @@ class StaticAnalyzer:
                             'rule': item.get('rule', '')
                         })
 
-                    logger.info(f"ktlint found {len(issues)} issues")
+                    logger.info("ktlint found %d issues", len(issues))
                     return issues
 
                 except json.JSONDecodeError:
@@ -601,8 +597,8 @@ class StaticAnalyzer:
             return [{'tool': 'ktlint', 'severity': 'warning', 'message': 'Analysis timed out'}]
         except FileNotFoundError:
             return [{'tool': 'ktlint', 'severity': 'info', 'message': 'ktlint not found'}]
-        except Exception as e:
-            logger.error(f"ktlint failed: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("ktlint failed: %s", e)
             return [{'tool': 'ktlint', 'severity': 'warning', 'message': f'Analysis failed: {str(e)}'}]
 
         return []
@@ -623,7 +619,7 @@ class StaticAnalyzer:
             }]
 
         try:
-            logger.info(f"Running SwiftLint on Swift code in {self.project_path}")
+            logger.info("Running SwiftLint on Swift code in %s", self.project_path)
 
             result = subprocess.run(
                 ['swiftlint', 'lint', '--reporter', 'json'],
@@ -653,7 +649,7 @@ class StaticAnalyzer:
                             'rule_id': item.get('rule_id', '')
                         })
 
-                    logger.info(f"SwiftLint found {len(issues)} issues")
+                    logger.info("SwiftLint found %d issues", len(issues))
                     return issues
 
                 except json.JSONDecodeError:
@@ -664,8 +660,8 @@ class StaticAnalyzer:
             return [{'tool': 'swiftlint', 'severity': 'warning', 'message': 'Analysis timed out'}]
         except FileNotFoundError:
             return [{'tool': 'swiftlint', 'severity': 'info', 'message': 'SwiftLint not found'}]
-        except Exception as e:
-            logger.error(f"SwiftLint failed: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("SwiftLint failed: %s", e)
             return [{'tool': 'swiftlint', 'severity': 'warning', 'message': f'Analysis failed: {str(e)}'}]
 
         return []
@@ -686,7 +682,7 @@ class StaticAnalyzer:
             }]
 
         try:
-            logger.info(f"Running dotnet build on C# code in {self.project_path}")
+            logger.info("Running dotnet build on C# code in %s", self.project_path)
 
             # First, try to find .csproj or .sln files
             csproj_files = list(self.project_path.rglob('*.csproj'))
@@ -730,8 +726,9 @@ class StaticAnalyzer:
                             file_path = location.split('(')[0]
                             try:
                                 line_num = int(location.split('(')[1].split(',')[0])
-                            except:
-                                pass
+                            except ValueError:
+                                # 줄 번호 파싱 실패 시 0으로 유지
+                                line_num = 0
 
                         severity = 'critical' if 'error' in severity_type else 'warning'
                         issues.append({
@@ -742,7 +739,7 @@ class StaticAnalyzer:
                             'message': message
                         })
 
-            logger.info(f"Roslyn analyzers found {len(issues)} issues")
+            logger.info("Roslyn analyzers found %d issues", len(issues))
             return issues
 
         except subprocess.TimeoutExpired:
@@ -750,8 +747,8 @@ class StaticAnalyzer:
             return [{'tool': 'roslyn', 'severity': 'warning', 'message': 'Analysis timed out'}]
         except FileNotFoundError:
             return [{'tool': 'roslyn', 'severity': 'info', 'message': '.NET SDK not found'}]
-        except Exception as e:
-            logger.error(f"dotnet build failed: {e}")
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("dotnet build failed: %s", e)
             return [{'tool': 'roslyn', 'severity': 'warning', 'message': f'Analysis failed: {str(e)}'}]
 
         return []

@@ -100,7 +100,7 @@ logger = setup_logger(__name__)
     default=False,
     help='캐시 데이터 삭제'
 )
-def audit(path: Path, mode: Optional[str], skip_ai: bool, verbose: bool, quiet: bool, output: Optional[Path], format: Optional[str], config: Optional[Path], init_config: bool, no_history: bool, show_history: bool, no_cache: bool, clear_cache: bool):
+def audit(path: Path, mode: Optional[str], skip_ai: bool, verbose: bool, quiet: bool, output: Optional[Path], format: Optional[str], config: Optional[Path], init_config: bool, no_history: bool, show_history: bool, no_cache: bool, clear_cache: bool):  # pylint: disable=redefined-builtin
     """
     Vibe-Code Auditor: AI + 정적 분석 기반 코드 감사 도구
 
@@ -163,7 +163,7 @@ def audit(path: Path, mode: Optional[str], skip_ai: bool, verbose: bool, quiet: 
     # Load configuration
     if config:
         # Custom config file path
-        logger.info(f"Loading configuration from {config}")
+        logger.info("Loading configuration from %s", config)
         # We need to load this config file manually
         import yaml
         try:
@@ -171,7 +171,10 @@ def audit(path: Path, mode: Optional[str], skip_ai: bool, verbose: bool, quiet: 
                 user_config = yaml.safe_load(f) or {}
             config_loader = ConfigLoader(path)
             config_loader.config = config_loader._deep_merge(config_loader.DEFAULT_CONFIG.copy(), user_config)
-        except Exception as e:
+        except (IOError, yaml.YAMLError, ValueError) as e:
+            console.print(f"[bold red]❌ 설정 파일 로드 실패:[/bold red] {e}\n")
+            sys.exit(1)
+        except Exception as e:  # pylint: disable=broad-except
             console.print(f"[bold red]❌ 설정 파일 로드 실패:[/bold red] {e}\n")
             sys.exit(1)
     else:
@@ -208,7 +211,7 @@ def audit(path: Path, mode: Optional[str], skip_ai: bool, verbose: bool, quiet: 
         logging.getLogger().setLevel(logging.WARNING)
         logger.setLevel(logging.WARNING)
 
-    logger.debug(f"Final configuration: mode={mode}, skip_ai={skip_ai}, output={output}, format={format}")
+    logger.debug("Final configuration: mode=%s, skip_ai=%s, output=%s, format=%s", mode, skip_ai, output, format)
 
     # Display analysis info
     mode_info = ANALYSIS_MODES[mode]
@@ -264,11 +267,10 @@ def audit(path: Path, mode: Optional[str], skip_ai: bool, verbose: bool, quiet: 
 
         result = engine.analyze()
 
-        languages = result['languages']
         static_results = result['static_results']
         ai_results = result['ai_results']
 
-    except (ValueError, RuntimeError) as e:
+    except (ValueError, RuntimeError):
         # Error already displayed by progress callback
         sys.exit(1)
 
@@ -295,7 +297,7 @@ def audit(path: Path, mode: Optional[str], skip_ai: bool, verbose: bool, quiet: 
                 console.print("지원 형식: .json, .html\n")
                 sys.exit(1)
 
-        logger.info(f"Saving {report_format.upper()} report to {output}")
+        logger.info("Saving %s report to %s", report_format.upper(), output)
 
         if report_format == 'json':
             json_reporter = JSONReporter(mode)
@@ -309,17 +311,13 @@ def audit(path: Path, mode: Optional[str], skip_ai: bool, verbose: bool, quiet: 
     console.print("\n[bold green]✅ 분석 완료![/bold green]\n")
 
 
-def main():
-    """Entry point for CLI."""
+if __name__ == '__main__':
     try:
-        audit()
+        # Click 데코레이터가 sys.argv를 자동으로 파싱하므로 인자 없이 호출 가능
+        audit()  # pylint: disable=no-value-for-parameter
     except KeyboardInterrupt:
         console.print("\n\n[yellow]분석이 중단되었습니다.[/yellow]")
         sys.exit(0)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         console.print(f"\n[bold red]❌ 오류 발생:[/bold red] {str(e)}\n")
         sys.exit(1)
-
-
-if __name__ == '__main__':
-    main()

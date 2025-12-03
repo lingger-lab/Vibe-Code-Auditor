@@ -81,7 +81,7 @@ class ConfigLoader:
             Configuration dictionary
         """
         if self.config_file.exists():
-            logger.info(f"Loading configuration from {self.config_file}")
+            logger.info("Loading configuration from %s", self.config_file)
             try:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     user_config = yaml.safe_load(f) or {}
@@ -92,15 +92,15 @@ class ConfigLoader:
                 return config
 
             except yaml.YAMLError as e:
-                logger.error(f"Failed to parse YAML config: {e}", exc_info=True)
+                logger.error("Failed to parse YAML config: %s", e, exc_info=True)
                 logger.warning("Using default configuration")
                 return self.DEFAULT_CONFIG.copy()
-            except Exception as e:
-                logger.error(f"Failed to load config: {e}", exc_info=True)
+            except (IOError, OSError) as e:
+                logger.error("Failed to load config: %s", e, exc_info=True)
                 logger.warning("Using default configuration")
                 return self.DEFAULT_CONFIG.copy()
         else:
-            logger.debug(f"No config file found at {self.config_file}, using defaults")
+            logger.debug("No config file found at %s, using defaults", self.config_file)
             return self.DEFAULT_CONFIG.copy()
 
     def _deep_merge(self, base: Dict, override: Dict) -> Dict:
@@ -165,7 +165,7 @@ class ConfigLoader:
         if output_path is None:
             output_path = self.project_path / '.vibe-auditor.yml.example'
 
-        logger.info(f"Saving configuration template to {output_path}")
+        logger.info("Saving configuration template to %s", output_path)
 
         template_content = """# Vibe-Code Auditor Configuration File
 # Place this file as .vibe-auditor.yml in your project root
@@ -223,11 +223,11 @@ exclude:
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(template_content)
 
-            logger.info(f"Configuration template saved to {output_path}")
+            logger.info("Configuration template saved to %s", output_path)
             return output_path
 
-        except Exception as e:
-            logger.error(f"Failed to save template: {e}", exc_info=True)
+        except (IOError, OSError, PermissionError) as e:
+            logger.error("Failed to save template: %s", e, exc_info=True)
             raise
 
     def validate(self) -> bool:

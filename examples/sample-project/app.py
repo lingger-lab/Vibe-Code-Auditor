@@ -1,8 +1,17 @@
-"""Sample Python application with intentional issues for testing."""
+"""Sample Python application with intentional issues for testing.
+
+⚠ WARNING / 경고
+이 파일은 Vibe-Code Auditor의 정적/AI 분석 기능을 테스트하기 위한
+\"취약한 예시 코드\"를 포함하고 있습니다.
+
+- 실제 서비스 코드에 이 예시를 그대로 복사/사용하면 안 됩니다.
+- 하드코딩된 비밀번호, API 키, SQL Injection 취약점 등은 모두 의도적인 예시입니다.
+"""
 
 import os
 
 # Intentional issue: Hardcoded credentials (Critical)
+# ⚠ 이 코드는 보안 취약점 예시를 위한 것으로, 실제 서비스에는 절대 사용하지 마세요.
 DATABASE_PASSWORD = "admin123"
 API_KEY = "sk-1234567890abcdef"
 
@@ -10,6 +19,7 @@ API_KEY = "sk-1234567890abcdef"
 def get_user_data(user_id):
     """Fetch user data from database."""
     # Intentional issue: SQL Injection vulnerability (Critical)
+    # ⚠ 취약한 예시: 교육용 목적이며, 실제 코드에서는 반드시 파라미터 바인딩을 사용해야 합니다.
     query = f"SELECT * FROM users WHERE id = {user_id}"
     return execute_query(query)
 

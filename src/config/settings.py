@@ -2,14 +2,43 @@
 
 import os
 from pathlib import Path
+from typing import Optional, Tuple
+
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
 # API Configuration
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+# 환경 변수에서 읽은 값을 공백 제거 후 문자열로 정규화
+ANTHROPIC_API_KEY: str = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
 CLAUDE_MODEL = "claude-opus-4-5-20251101"
+
+
+def validate_api_key() -> Tuple[bool, Optional[str]]:
+    """
+    ANTHROPIC_API_KEY 환경 변수의 존재 여부와 형식을 검증합니다.
+
+    Returns:
+        (is_valid, error_message)
+    """
+    if not ANTHROPIC_API_KEY:
+        return False, (
+            "ANTHROPIC_API_KEY 환경 변수가 설정되지 않았습니다. "
+            ".env 파일을 확인하거나 --skip-ai 옵션을 사용하세요."
+        )
+
+    # 기본 형식 검증: 접두어와 최소 길이
+    if not ANTHROPIC_API_KEY.startswith(("sk-ant-", "sk-")):
+        return False, (
+            "ANTHROPIC_API_KEY 값 형식이 올바르지 않습니다. "
+            "'sk-' 또는 'sk-ant-'로 시작하는 유효한 키인지 확인하세요."
+        )
+
+    if len(ANTHROPIC_API_KEY) < 20:
+        return False, "ANTHROPIC_API_KEY 값 길이가 너무 짧습니다. 전체 키를 정확히 입력해주세요."
+
+    return True, None
 
 # Analysis Modes
 ANALYSIS_MODES = {

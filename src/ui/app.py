@@ -9,7 +9,6 @@ to perform code analysis through a simple 3-click workflow:
 
 import streamlit as st
 from pathlib import Path
-import time
 from typing import Optional, Dict, Any
 import sys
 import json
@@ -49,6 +48,10 @@ def init_session_state():
         st.session_state.page_number = 0
     if 'items_per_page' not in st.session_state:
         st.session_state.items_per_page = 20
+    if 'current_view' not in st.session_state:
+        st.session_state.current_view = 'main'
+    if 'project_path' not in st.session_state:
+        st.session_state.project_path = ""
 
 
 def render_header():
@@ -56,6 +59,55 @@ def render_header():
     st.title("🔍 Vibe-Code Auditor")
     st.markdown("**AI 기반 코드 품질 분석 도구** - 간단한 3단계로 프로젝트를 분석하세요!")
     st.divider()
+
+
+def render_navigation(project_path: str = ""):
+    """Render top navigation bar."""
+    # Only show navigation if we have analysis results or are viewing secondary pages
+    if st.session_state.analysis_results or st.session_state.current_view != 'main':
+        st.markdown("### 📍 네비게이션")
+
+        # Navigation buttons
+        cols = st.columns(5)
+        
+        # 프로젝트 경로 확인 (session_state 또는 파라미터에서)
+        has_project_path = bool(st.session_state.project_path or project_path)
+
+        with cols[0]:
+            if st.button("🏠 메인", width='stretch',
+                        type="primary" if st.session_state.current_view == 'main' else "secondary"):
+                st.session_state.current_view = 'main'
+                st.rerun()
+
+        with cols[1]:
+            if st.button("📊 분석 결과", width='stretch',
+                        type="primary" if st.session_state.current_view == 'results' else "secondary",
+                        disabled=not st.session_state.analysis_results):
+                st.session_state.current_view = 'results'
+                st.rerun()
+
+        with cols[2]:
+            if st.button("📈 히스토리", width='stretch',
+                        type="primary" if st.session_state.current_view == 'history' else "secondary",
+                        disabled=not has_project_path):
+                st.session_state.current_view = 'history'
+                st.rerun()
+
+        with cols[3]:
+            if st.button("🔄 비교", width='stretch',
+                        type="primary" if st.session_state.current_view == 'comparison' else "secondary",
+                        disabled=not has_project_path):
+                st.session_state.current_view = 'comparison'
+                st.rerun()
+
+        with cols[4]:
+            if st.button("🌳 폴더 구조", width='stretch',
+                        type="primary" if st.session_state.current_view == 'tree' else "secondary",
+                        disabled=not has_project_path):
+                st.session_state.current_view = 'tree'
+                st.rerun()
+
+        st.divider()
 
 
 def render_sidebar() -> Dict[str, Any]:
@@ -71,55 +123,85 @@ def render_sidebar() -> Dict[str, Any]:
         # Project path selection with file browser
         st.subheader("1️⃣ 프로젝트 선택")
 
-        # Manual path input
-        project_path = st.text_input(
-            "프로젝트 폴더 경로",
-            placeholder="C:/Users/YourName/project",
-            help="분석할 프로젝트의 전체 경로를 입력하세요"
-        )
+        # Initialize project_path from session state
+        if 'project_path' not in st.session_state:
+            st.session_state.project_path = ""
 
         # Quick access to common locations
-        with st.expander("📂 빠른 경로 선택"):
+        with st.expander("📂 빠른 경로 선택", expanded=True):
             import subprocess
             import platform
+            import tkinter as tk
+            from tkinter import filedialog
 
             desktop = str(Path.home() / "Desktop")
             documents = str(Path.home() / "Documents")
+            home = str(Path.home())
 
-            def open_folder_in_explorer(folder_path):
-                """Open folder in system file explorer"""
+            def select_folder_dialog(initial_dir=None):
+                """Open folder selection dialog and return selected path"""
                 try:
-                    if platform.system() == 'Windows':
-                        subprocess.run(['explorer', folder_path])
-                    elif platform.system() == 'Darwin':  # macOS
-                        subprocess.run(['open', folder_path])
-                    else:  # Linux
-                        subprocess.run(['xdg-open', folder_path])
-                except Exception as e:
-                    st.error(f"탐색기 열기 실패: {e}")
+                    # Create a root window and hide it
+                    root = tk.Tk()
+                    root.withdraw()
+                    root.wm_attributes('-topmost', 1)
+
+                    # Open folder selection dialog
+                    folder_path = filedialog.askdirectory(
+                        parent=root,
+                        initialdir=initial_dir if initial_dir else str(Path.home()),
+                        title="분석할 프로젝트 폴더를 선택하세요"
+                    )
+
+                    root.destroy()
+                    return folder_path if folder_path else None
+                except Exception as e:  # pylint: disable=broad-exception-caught
+                    # 파일 선택 대화상자는 OS/환경에 따라 다양한 예외가 발생할 수 있으므로
+                    # 최상위에서 한 번만 잡고 사용자에게 오류 메시지를 보여줍니다.
+                    st.error(f"폴더 선택 실패: {e}")
+                    return None
+
+            st.caption("📌 아래 버튼을 클릭하면 폴더 선택 창이 열립니다")
+
+            # Folder browser button (primary action)
+            if st.button("📁 폴더 선택", width='stretch', type="primary", key="btn_browse"):
+                selected_path = select_folder_dialog()
+                if selected_path:
+                    st.session_state.project_path = selected_path
+                    st.rerun()
+
+            st.divider()
+            st.caption("⚡ 또는 빠른 경로로 바로 이동:")
 
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🖥️ 바탕화면", use_container_width=True):
-                    open_folder_in_explorer(desktop)
-                    st.session_state.quick_path = desktop
-                    st.rerun()
+                if st.button("🖥️ 바탕화면", width='stretch', key="btn_desktop"):
+                    selected_path = select_folder_dialog(desktop)
+                    if selected_path:
+                        st.session_state.project_path = selected_path
+                        st.rerun()
             with col2:
-                if st.button("📁 문서", use_container_width=True):
-                    open_folder_in_explorer(documents)
-                    st.session_state.quick_path = documents
+                if st.button("📁 문서", width='stretch', key="btn_documents"):
+                    selected_path = select_folder_dialog(documents)
+                    if selected_path:
+                        st.session_state.project_path = selected_path
+                        st.rerun()
+
+            if st.button("🏠 홈 디렉토리", width='stretch', key="btn_home"):
+                selected_path = select_folder_dialog(home)
+                if selected_path:
+                    st.session_state.project_path = selected_path
                     st.rerun()
 
-            if st.button("🏠 홈 디렉토리", use_container_width=True):
-                open_folder_in_explorer(str(Path.home()))
-                st.session_state.quick_path = str(Path.home())
-                st.rerun()
+            st.caption("💡 폴더 선택 창에서 원하는 프로젝트 폴더를 선택하면 자동으로 경로가 입력됩니다")
 
-        # Apply quick path if selected
-        if 'quick_path' in st.session_state and not project_path:
-            project_path = st.session_state.quick_path
-
-        st.caption("💡 Tip: 탐색기에서 폴더를 복사하여 붙여넣으세요")
+        # Manual path input (uses session state directly as key)
+        project_path = st.text_input(
+            "프로젝트 폴더 경로",
+            placeholder="예: C:/Users/YourName/Desktop/my-project",
+            help="분석할 프로젝트의 전체 경로를 입력하세요. 위의 빠른 경로 버튼을 사용하거나 직접 입력할 수 있습니다.",
+            key="project_path"
+        )
 
         st.divider()
 
@@ -164,7 +246,7 @@ def render_sidebar() -> Dict[str, Any]:
         start_button = st.button(
             "🚀 분석 시작",
             type="primary",
-            use_container_width=True,
+            width='stretch',
             disabled=not project_path or st.session_state.analysis_running
         )
 
@@ -177,17 +259,17 @@ def render_sidebar() -> Dict[str, Any]:
             with col1:
                 show_history = st.button(
                     "📈 히스토리",
-                    use_container_width=True
+                    width='stretch'
                 )
             with col2:
                 show_comparison = st.button(
                     "🔄 비교",
-                    use_container_width=True
+                    width='stretch'
                 )
 
             show_tree = st.button(
                 "🌳 폴더 구조",
-                use_container_width=True
+                width='stretch'
             )
         else:
             show_history = False
@@ -266,7 +348,7 @@ def render_download_buttons(results: Dict[str, Any], project_path: Path, mode: s
             data=json_str,
             file_name=f"vibe-audit-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json",
             mime="application/json",
-            use_container_width=True
+            width='stretch'
         )
 
     with col2:
@@ -295,7 +377,7 @@ def render_download_buttons(results: Dict[str, Any], project_path: Path, mode: s
                 data=html_content,
                 file_name=f"vibe-audit-{datetime.now().strftime('%Y%m%d-%H%M%S')}.html",
                 mime="text/html",
-                use_container_width=True
+                width='stretch'
             )
         except Exception as e:
             st.error(f"HTML 생성 실패: {e}")
@@ -305,27 +387,18 @@ def render_download_buttons(results: Dict[str, Any], project_path: Path, mode: s
         try:
             pdf_reporter = PDFReporter(mode)
 
-            # Generate PDF in memory
-            temp_path = Path("temp_report.pdf")
-            pdf_reporter.generate_report(
+            # Generate PDF directly to memory (BytesIO)
+            pdf_content = pdf_reporter.generate_report_to_bytes(
                 results,
-                project_path,
-                temp_path
+                project_path
             )
-
-            # Read generated PDF
-            with open(temp_path, 'rb') as f:
-                pdf_content = f.read()
-
-            # Clean up temp file
-            temp_path.unlink(missing_ok=True)
 
             st.download_button(
                 label="📑 PDF 다운로드",
                 data=pdf_content,
                 file_name=f"vibe-audit-{datetime.now().strftime('%Y%m%d-%H%M%S')}.pdf",
                 mime="application/pdf",
-                use_container_width=True
+                width='stretch'
             )
         except Exception as e:
             st.error(f"PDF 생성 실패: {e}")
@@ -367,11 +440,11 @@ def render_paginated_issues(issues: list, title: str):
     with col3:
         col_prev, col_next = st.columns(2)
         with col_prev:
-            if st.button("◀ 이전", disabled=st.session_state.page_number == 0, use_container_width=True, key=f"prev_{title}"):
+            if st.button("◀ 이전", disabled=st.session_state.page_number == 0, width='stretch', key=f"prev_{title}"):
                 st.session_state.page_number = max(0, st.session_state.page_number - 1)
                 st.rerun()
         with col_next:
-            if st.button("다음 ▶", disabled=st.session_state.page_number >= total_pages - 1, use_container_width=True, key=f"next_{title}"):
+            if st.button("다음 ▶", disabled=st.session_state.page_number >= total_pages - 1, width='stretch', key=f"next_{title}"):
                 st.session_state.page_number = min(total_pages - 1, st.session_state.page_number + 1)
                 st.rerun()
 
@@ -405,6 +478,13 @@ def render_history_viewer(project_path: Path):
     Args:
         project_path: Project path
     """
+    # Back button
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        if st.button("🏠 메인으로", type="secondary", width='stretch'):
+            st.session_state.current_view = 'main'
+            st.rerun()
+
     st.header("📈 분석 히스토리")
 
     try:
@@ -462,7 +542,7 @@ def render_history_viewer(project_path: Path):
                 height=400
             )
 
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
         # Recent history table
         st.subheader("최근 분석 기록")
@@ -480,7 +560,7 @@ def render_history_viewer(project_path: Path):
         if history_data:
             import pandas as pd
             df = pd.DataFrame(history_data)
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.dataframe(df, width='stretch', hide_index=True)
 
     except Exception as e:
         st.error(f"히스토리 로드 실패: {e}")
@@ -493,6 +573,13 @@ def render_comparison_mode(project_path: Path):
     Args:
         project_path: Project path
     """
+    # Back button
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        if st.button("🏠 메인으로", type="secondary", width='stretch', key="comparison_back"):
+            st.session_state.current_view = 'main'
+            st.rerun()
+
     st.header("🔄 분석 결과 비교")
 
     try:
@@ -611,7 +698,7 @@ def render_comparison_mode(project_path: Path):
             height=400
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
         # Analysis
         st.subheader("💡 분석")
@@ -660,6 +747,13 @@ def render_folder_tree(project_path: Path):
     Args:
         project_path: Project path
     """
+    # Back button
+    col1, col2 = st.columns([1, 5])
+    with col1:
+        if st.button("🏠 메인으로", type="secondary", width='stretch', key="tree_back"):
+            st.session_state.current_view = 'main'
+            st.rerun()
+
     st.header("🌳 프로젝트 폴더 구조")
 
     st.info("프로젝트의 폴더 구조를 표시합니다. 분석 대상 파일을 확인할 수 있습니다.")
@@ -799,6 +893,24 @@ def render_results_summary(results: Dict[str, Any], project_path: Path, mode: st
         project_path: Project path
         mode: Analysis mode
     """
+    # Action buttons at top
+    col1, col2, col3 = st.columns([2, 2, 2])
+    with col1:
+        if st.button("🔄 새 분석 시작", type="primary", width='stretch'):
+            st.session_state.analysis_results = None
+            st.session_state.current_view = 'main'
+            st.session_state.page_number = 0
+            st.rerun()
+    with col2:
+        if st.button("📈 히스토리 보기", type="secondary", width='stretch'):
+            st.session_state.current_view = 'history'
+            st.rerun()
+    with col3:
+        if st.button("🔄 결과 비교", type="secondary", width='stretch'):
+            st.session_state.current_view = 'comparison'
+            st.rerun()
+
+    st.divider()
     st.header("📊 분석 결과")
 
     # Extract data
@@ -912,7 +1024,7 @@ def render_summary_tab(results: Dict[str, Any]):
             height=400
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     else:
         st.info("발견된 이슈가 없습니다! 🎉")
 
@@ -954,32 +1066,95 @@ def render_ai_analysis_tab(ai_results: Optional[Dict[str, Any]]):
     """Render AI analysis results tab."""
     st.subheader("AI 코드 리뷰 결과")
 
+    # 결과 자체가 없거나 skip 된 경우
     if not ai_results:
         st.info("AI 분석이 건너뛰어졌거나 결과가 없습니다.")
         return
 
-    insights = ai_results.get('insights', [])
+    # API 오류/타임아웃 등으로 실패한 경우
+    if ai_results.get("error"):
+        st.warning(f"AI 분석 중 오류가 발생했습니다: {ai_results['error']}")
+        st.info("🔑 API 키 설정, 네트워크 연결, 타임아웃 설정 등을 확인해 주세요.")
+        return
 
-    if not insights:
+    issues = ai_results.get("issues", [])
+
+    if not issues:
         st.success("AI 분석에서 특별한 이슈를 발견하지 못했습니다! 🎉")
         return
 
-    st.write(f"**총 {len(insights)}개 인사이트 발견**")
+    st.write(f"**총 {len(issues)}개 AI 이슈 발견**")
 
-    for idx, insight in enumerate(insights, 1):
-        severity_emoji = {
-            'critical': '🔴',
-            'warning': '🟡',
-            'info': '🟢'
-        }.get(insight.get('severity', 'info'), '⚪')
+    # 심각도별 이슈 그룹핑 (HTML/JSON과 동일한 구조 사용)
+    issues_by_severity = {
+        "critical": [],
+        "warning": [],
+        "info": [],
+    }
 
-        with st.expander(f"{idx}. {severity_emoji} {insight.get('category', 'General')}: {insight.get('message', 'No message')[:80]}..."):
-            st.write(f"**카테고리**: {insight.get('category', 'N/A')}")
-            st.write(f"**심각도**: {insight.get('severity', 'N/A')}")
-            st.write(f"**메시지**: {insight.get('message', 'N/A')}")
+    for issue in issues:
+        severity = issue.get("severity", "info").lower()
+        if severity in issues_by_severity:
+            issues_by_severity[severity].append(issue)
+        else:
+            issues_by_severity["info"].append(issue)
 
-            if insight.get('recommendation'):
-                st.info(f"💡 **권장사항**: {insight['recommendation']}")
+    severity_order = ["critical", "warning", "info"]
+    severity_labels = {
+        "critical": "🔴 Critical",
+        "warning": "🟡 Warning",
+        "info": "🟢 Info",
+    }
+
+    for severity in severity_order:
+        severity_issues = issues_by_severity[severity]
+        if not severity_issues:
+            continue
+
+        st.markdown(f"### {severity_labels[severity]} ({len(severity_issues)}개)")
+
+        for idx, issue in enumerate(severity_issues, 1):
+            raw_title = issue.get("title", "No title") or "No title"
+            details = issue.get("details", []) or []
+
+            # Markdown 표(| ... |), 코드펜스(```), 언어 태그만 있는 줄은 제거
+            filtered_details = []
+            for line in details:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                if stripped.startswith("|"):
+                    continue
+                if stripped.startswith("```"):
+                    continue
+                if stripped in {"python", "bash", "sh", "json", "yaml"}:
+                    continue
+                filtered_details.append(line)
+
+            # 제목이 표/마스킹이고 실제 설명 줄이 있을 때만 첫 번째 줄을 제목으로 승격
+            promote_to_detail_title = (
+                (raw_title.strip().startswith("|") or raw_title.replace("■", "").strip() == "")
+                and bool(filtered_details)
+            )
+
+            if promote_to_detail_title:
+                title = filtered_details[0][:80]
+                body_lines = filtered_details[1:]
+            else:
+                # 승격 불가하고 제목이 여전히 표/마스킹 뿐이면, 안전한 기본 제목 사용
+                if raw_title.strip().startswith("|") or raw_title.replace("■", "").strip() == "":
+                    title = "AI 분석 이슈"
+                else:
+                    title = raw_title
+                body_lines = filtered_details
+
+            # 한 이슈를 하나의 expander로 묶어서 상세 설명 표시
+            with st.expander(f"{idx}. {title}"):
+                if body_lines:
+                    for line in body_lines:
+                        st.write(f"- {line}")
+                else:
+                    st.write("세부 설명이 없습니다.")
 
 
 def render_languages_tab(languages: list, issues: list):
@@ -1012,7 +1187,7 @@ def render_languages_tab(languages: list, issues: list):
         height=400
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     # Table
     st.write("**언어별 이슈 개수**")
@@ -1065,9 +1240,27 @@ def main():
     """Main Streamlit application."""
     init_session_state()
     render_header()
-
+    
     # Sidebar configuration
     config = render_sidebar()
+    
+    # 주의: st.text_input(key="project_path")가 이미 session_state를 자동 관리하므로
+    # 위젯 생성 후에는 session_state를 직접 수정할 수 없습니다.
+    # config['project_path']는 위젯의 현재 값을 반환하므로 그대로 사용합니다.
+    
+    # 네비게이션 렌더링 (project_path 전달)
+    render_navigation(config.get('project_path', ''))
+
+    # Handle sidebar button clicks (legacy support)
+    if config.get('show_history'):
+        st.session_state.current_view = 'history'
+        st.rerun()
+    elif config.get('show_comparison'):
+        st.session_state.current_view = 'comparison'
+        st.rerun()
+    elif config.get('show_tree'):
+        st.session_state.current_view = 'tree'
+        st.rerun()
 
     # Main content area
     if config['start_button']:
@@ -1082,29 +1275,45 @@ def main():
             with st.spinner('분석 중...'):
                 run_analysis(config)
 
-            # Trigger rerun to update UI
+            # Set view to results and trigger rerun
+            st.session_state.current_view = 'results'
             st.rerun()
 
-    # Display progress or results
+    # Display content based on current_view
     if st.session_state.analysis_running:
         st.header("⏳ 분석 진행 중...")
         render_progress_display()
-    elif config.get('show_history') and config['project_path']:
-        # Show history viewer
-        render_history_viewer(Path(config['project_path']))
-    elif config.get('show_comparison') and config['project_path']:
-        # Show comparison mode
-        render_comparison_mode(Path(config['project_path']))
-    elif config.get('show_tree') and config['project_path']:
-        # Show folder tree viewer
-        render_folder_tree(Path(config['project_path']))
-    elif st.session_state.analysis_results:
+    elif st.session_state.current_view == 'history':
+        # 프로젝트 경로 확인
+        project_path_str = config.get('project_path') or st.session_state.project_path
+        if project_path_str and Path(project_path_str).exists():
+            render_history_viewer(Path(project_path_str))
+        else:
+            st.warning("⚠️ 프로젝트 경로를 먼저 설정해주세요.")
+            st.info("👈 왼쪽 사이드바에서 프로젝트 폴더를 선택하세요.")
+    elif st.session_state.current_view == 'comparison':
+        # 프로젝트 경로 확인
+        project_path_str = config.get('project_path') or st.session_state.project_path
+        if project_path_str and Path(project_path_str).exists():
+            render_comparison_mode(Path(project_path_str))
+        else:
+            st.warning("⚠️ 프로젝트 경로를 먼저 설정해주세요.")
+            st.info("👈 왼쪽 사이드바에서 프로젝트 폴더를 선택하세요.")
+    elif st.session_state.current_view == 'tree':
+        # 프로젝트 경로 확인
+        project_path_str = config.get('project_path') or st.session_state.project_path
+        if project_path_str and Path(project_path_str).exists():
+            render_folder_tree(Path(project_path_str))
+        else:
+            st.warning("⚠️ 프로젝트 경로를 먼저 설정해주세요.")
+            st.info("👈 왼쪽 사이드바에서 프로젝트 폴더를 선택하세요.")
+    elif st.session_state.current_view == 'results' and st.session_state.analysis_results:
         render_results_summary(
             st.session_state.analysis_results,
-            Path(config['project_path']),
+            Path(config.get('project_path', st.session_state.project_path)),
             config['mode']
         )
-    else:
+    elif st.session_state.current_view == 'main' or not st.session_state.analysis_results:
         # Welcome screen
         st.info("👈 왼쪽 사이드바에서 프로젝트를 선택하고 분석을 시작하세요!")
 
@@ -1114,7 +1323,10 @@ def main():
         2. **분석 관점 선택**: 배포 관점 또는 개인 사용 관점을 선택하세요
         3. **분석 시작**: '🚀 분석 시작' 버튼을 클릭하세요
 
-        ### ✨ v1.9.0 새로운 기능
+        ### ✨ v1.10.0 새로운 기능
+        - 📍 **상단 네비게이션 바**: 메인, 분석 결과, 히스토리, 비교, 폴더 구조 간 빠른 이동
+        - 🏠 **홈으로 돌아가기**: 모든 화면에서 메인 페이지로 쉽게 복귀
+        - 🔄 **새 분석 시작**: 분석 결과 화면에서 바로 새로운 분석 시작
         - 📂 **빠른 경로 선택**: 바탕화면, 문서 폴더 빠른 접근
         - 📄 **결과 다운로드**: JSON/HTML/PDF 형식으로 저장
         - 📈 **히스토리 뷰어**: 과거 분석 결과 및 추세 확인

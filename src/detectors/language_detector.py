@@ -66,9 +66,9 @@ class LanguageDetector:
                     # For parallel processing, we'll handle subdirectories separately
                     pass
         except PermissionError:
-            logger.debug(f"Permission denied: {directory}")
-        except Exception as e:
-            logger.debug(f"Error scanning {directory}: {e}")
+            logger.debug("Permission denied: %s", directory)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.debug("Error scanning %s: %s", directory, e)
 
         return code_files
 
@@ -91,7 +91,7 @@ class LanguageDetector:
             return code_files
 
         # Parallel scanning
-        logger.debug(f"Scanning files with {self.max_workers} workers")
+        logger.debug("Scanning files with %d workers", self.max_workers)
         code_files = []
         directories_to_scan = [self.project_path]
         scanned_dirs = set()
@@ -115,11 +115,11 @@ class LanguageDetector:
                 try:
                     files = future.result()
                     code_files.extend(files)
-                except Exception as e:
+                except Exception as e:  # pylint: disable=broad-exception-caught
                     directory = future_to_dir[future]
-                    logger.debug(f"Error scanning directory {directory}: {e}")
+                    logger.debug("Error scanning directory %s: %s", directory, e)
 
-        logger.debug(f"Found {len(code_files)} files")
+        logger.debug("Found %d files", len(code_files))
         return code_files
 
     def detect(self) -> List[str]:
