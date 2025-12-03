@@ -1,8 +1,9 @@
 """AI-powered code analysis using Claude Code API."""
 
 import os
+import re
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 import anthropic
 
 from src.config.settings import ANTHROPIC_API_KEY, CLAUDE_MODEL, ANALYSIS_MODES
@@ -27,18 +28,105 @@ class AIAnalyzer:
         self.mode = mode
         self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         self.mode_config = ANALYSIS_MODES[mode]
+        self.analyzed_files: Set[str] = set()  # Track analyzed files to avoid duplicates
 
-    def _collect_code_samples(self, max_files: int = 10) -> List[Dict[str, str]]:
+    def _calculate_file_score(self, file_path: Path, content: str) -> float:
         """
-        Collect representative code samples from the project.
+        Calculate importance score for a file based on multiple criteria.
+
+        Args:
+            file_path: Path to the file
+            content: File content
+
+        Returns:
+            Score (higher = more important)
+        """
+        score = 0.0
+        filename = file_path.name.lower()
+
+        # 1. Filename pattern scoring (most important)
+        high_priority_patterns = [
+            'main', 'app', 'index', 'server', 'client',
+            'config', 'settings', 'router', 'controller',
+            'service', 'manager', 'handler', 'api'
+        ]
+        medium_priority_patterns = ['model', 'view', 'component', 'module']
+        low_priority_patterns = ['util', 'helper', 'common', 'test', 'spec']
+
+        for pattern in high_priority_patterns:
+            if pattern in filename:
+                score += 100
+                break
+        for pattern in medium_priority_patterns:
+            if pattern in filename:
+                score += 50
+                break
+        for pattern in low_priority_patterns:
+            if pattern in filename:
+                score -= 30  # Penalty for utility files
+
+        # 2. Path depth (prefer files closer to root)
+        depth = len(file_path.relative_to(self.project_path).parts)
+        score += max(0, 50 - (depth * 10))  # Closer to root = higher score
+
+        # 3. Complexity analysis
+        lines = content.split('\n')
+
+        # Count functions/methods
+        func_patterns = [
+            r'def\s+\w+',  # Python
+            r'function\s+\w+',  # JavaScript
+            r'func\s+\w+',  # Go/Swift
+            r'public\s+\w+\s+\w+\s*\(',  # Java/C#
+        ]
+        func_count = sum(len(re.findall(pattern, content)) for pattern in func_patterns)
+        score += func_count * 5
+
+        # Count classes
+        class_patterns = [
+            r'class\s+\w+',  # Python/Java/C#/JavaScript
+            r'struct\s+\w+',  # Go/Rust
+            r'interface\s+\w+',  # TypeScript/Java
+        ]
+        class_count = sum(len(re.findall(pattern, content)) for pattern in class_patterns)
+        score += class_count * 10
+
+        # Count imports (indicates connections to other modules)
+        import_patterns = [
+            r'import\s+',  # Python/JavaScript/Java
+            r'from\s+\w+\s+import',  # Python
+            r'require\(',  # JavaScript
+            r'use\s+',  # Rust/PHP
+        ]
+        import_count = sum(len(re.findall(pattern, content)) for pattern in import_patterns)
+        score += import_count * 3
+
+        # 4. File size (larger files often more important, but not too large)
+        line_count = len(lines)
+        if 50 <= line_count <= 500:
+            score += 20
+        elif line_count > 500:
+            score += 10
+
+        return score
+
+    def _collect_code_samples(self, max_files: int = 50, skip_analyzed: bool = True) -> List[Dict[str, str]]:
+        """
+        Collect smart-selected code samples from the project.
+
+        Uses intelligent ranking based on:
+        1. Filename patterns (main.py, app.js prioritized)
+        2. Path depth (files closer to root prioritized)
+        3. Complexity (functions, classes, imports count)
+        4. File size
 
         Args:
             max_files: Maximum number of files to sample
+            skip_analyzed: Skip previously analyzed files (for incremental analysis)
 
         Returns:
-            List of code samples with file paths
+            List of code samples with file paths, sorted by importance
         """
-        code_samples = []
         exclude_dirs = {'node_modules', 'venv', '.venv', '.git', '__pycache__', 'build', 'dist', 'target', 'vendor'}
         file_extensions = {
             '.py', '.js', '.jsx', '.ts', '.tsx',  # Python, JavaScript, TypeScript
@@ -51,36 +139,65 @@ class AIAnalyzer:
             '.swift'  # Swift
         }
 
-        count = 0
-        for file_path in self.project_path.rglob('*'):
-            if count >= max_files:
-                break
+        # Collect all eligible files with scores
+        file_scores = []
 
+        for file_path in self.project_path.rglob('*'):
             # Skip excluded directories
             if any(excluded in file_path.parts for excluded in exclude_dirs):
                 continue
 
             # Only include relevant code files
-            if file_path.is_file() and file_path.suffix in file_extensions:
-                try:
-                    # Read file content (limit to 500 lines to avoid token limits)
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        lines = f.readlines()[:500]
-                        content = ''.join(lines)
+            if not (file_path.is_file() and file_path.suffix in file_extensions):
+                continue
 
-                    if content.strip():  # Only include non-empty files
-                        relative_path = file_path.relative_to(self.project_path)
-                        code_samples.append({
-                            'path': str(relative_path),
-                            'content': content,
-                            'extension': file_path.suffix
-                        })
-                        count += 1
+            # Skip already analyzed files if requested
+            relative_path = str(file_path.relative_to(self.project_path))
+            if skip_analyzed and relative_path in self.analyzed_files:
+                continue
 
-                except Exception:
-                    continue  # Skip files that can't be read
+            try:
+                # Read file content (limit to 500 lines to avoid token limits)
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.readlines()[:500]
+                    content = ''.join(lines)
 
-        return code_samples
+                if not content.strip():  # Skip empty files
+                    continue
+
+                # Calculate importance score
+                score = self._calculate_file_score(file_path, content)
+
+                file_scores.append({
+                    'path': relative_path,
+                    'full_path': file_path,
+                    'content': content,
+                    'extension': file_path.suffix,
+                    'score': score
+                })
+
+            except Exception as e:
+                logger.debug(f"Failed to read {file_path}: {e}")
+                continue
+
+        # Sort by score (descending) and take top N
+        file_scores.sort(key=lambda x: x['score'], reverse=True)
+        selected_files = file_scores[:max_files]
+
+        logger.info(f"Selected {len(selected_files)} files from {len(file_scores)} candidates")
+        if selected_files:
+            logger.info(f"Top file: {selected_files[0]['path']} (score: {selected_files[0]['score']:.1f})")
+
+        # Mark files as analyzed
+        for file_info in selected_files:
+            self.analyzed_files.add(file_info['path'])
+
+        # Return samples without score (for API call)
+        return [{
+            'path': f['path'],
+            'content': f['content'],
+            'extension': f['extension']
+        } for f in selected_files]
 
     def _build_analysis_prompt(self, code_samples: List[Dict[str, str]]) -> str:
         """
@@ -196,8 +313,8 @@ class AIAnalyzer:
         try:
             logger.info(f"Starting AI analysis for {self.project_path} in {self.mode} mode")
 
-            # Collect code samples
-            code_samples = self._collect_code_samples(max_files=10)
+            # Collect code samples (smart selection: 50 most important files)
+            code_samples = self._collect_code_samples(max_files=50, skip_analyzed=True)
 
             if not code_samples:
                 logger.warning(f"No code files found to analyze in {self.project_path}")
