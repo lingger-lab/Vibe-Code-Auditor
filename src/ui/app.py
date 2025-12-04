@@ -1354,15 +1354,118 @@ def main():
 # Streamlit 실행
 # Streamlit Cloud와 로컬 환경 모두에서 작동하도록 처리
 # Streamlit은 파일을 import할 때 최상위 레벨 코드를 실행하므로
-# main()을 직접 호출합니다
-# Streamlit Cloud에서는 __name__이 "__main__"이 아닐 수 있으므로 항상 실행
+# main()의 내용을 직접 실행합니다 (함수 호출 대신)
 
 # 디버깅을 위해 로그 추가
 import traceback
+
+# Streamlit Cloud에서 안정적으로 작동하도록 main() 함수의 내용을 직접 실행
 try:
     logger.info("Starting Streamlit app...")
     logger.info("__name__ = %s", __name__)
-    main()
+    
+    # main() 함수의 내용을 직접 실행 (함수 호출 대신)
+    init_session_state()
+    render_header()
+    
+    # Sidebar configuration
+    config = render_sidebar()
+    
+    # 네비게이션 렌더링 (project_path 전달)
+    render_navigation(config.get('project_path', ''))
+    
+    # Handle sidebar button clicks (legacy support)
+    if config.get('show_history'):
+        st.session_state.current_view = 'history'
+        st.rerun()
+    elif config.get('show_comparison'):
+        st.session_state.current_view = 'comparison'
+        st.rerun()
+    elif config.get('show_tree'):
+        st.session_state.current_view = 'tree'
+        st.rerun()
+    
+    # Main content area
+    if config['start_button']:
+        # Validate project path
+        project_path = Path(config['project_path'])
+        if not project_path.exists():
+            st.error(f"❌ 프로젝트 경로가 존재하지 않습니다: {config['project_path']}")
+        elif not project_path.is_dir():
+            st.error(f"❌ 유효한 디렉토리가 아닙니다: {config['project_path']}")
+        else:
+            # Run analysis
+            with st.spinner('분석 중...'):
+                run_analysis(config)
+            
+            # Set view to results and trigger rerun
+            st.session_state.current_view = 'results'
+            st.rerun()
+    
+    # Display content based on current_view
+    if st.session_state.analysis_running:
+        st.header("⏳ 분석 진행 중...")
+        render_progress_display()
+    elif st.session_state.current_view == 'history':
+        # 프로젝트 경로 확인
+        project_path_str = config.get('project_path') or st.session_state.project_path
+        if project_path_str and Path(project_path_str).exists():
+            render_history_viewer(Path(project_path_str))
+        else:
+            st.warning("⚠️ 프로젝트 경로를 먼저 설정해주세요.")
+            st.info("👈 왼쪽 사이드바에서 프로젝트 폴더를 선택하세요.")
+    elif st.session_state.current_view == 'comparison':
+        # 프로젝트 경로 확인
+        project_path_str = config.get('project_path') or st.session_state.project_path
+        if project_path_str and Path(project_path_str).exists():
+            render_comparison_mode(Path(project_path_str))
+        else:
+            st.warning("⚠️ 프로젝트 경로를 먼저 설정해주세요.")
+            st.info("👈 왼쪽 사이드바에서 프로젝트 폴더를 선택하세요.")
+    elif st.session_state.current_view == 'tree':
+        # 프로젝트 경로 확인
+        project_path_str = config.get('project_path') or st.session_state.project_path
+        if project_path_str and Path(project_path_str).exists():
+            render_folder_tree(Path(project_path_str))
+        else:
+            st.warning("⚠️ 프로젝트 경로를 먼저 설정해주세요.")
+            st.info("👈 왼쪽 사이드바에서 프로젝트 폴더를 선택하세요.")
+    elif st.session_state.current_view == 'results' and st.session_state.analysis_results:
+        render_results_summary(
+            st.session_state.analysis_results,
+            Path(config.get('project_path', st.session_state.project_path)),
+            config['mode']
+        )
+    elif st.session_state.current_view == 'main' or not st.session_state.analysis_results:
+        # Welcome screen
+        st.info("👈 왼쪽 사이드바에서 프로젝트를 선택하고 분석을 시작하세요!")
+        
+        st.subheader("📖 사용 방법")
+        st.markdown("""
+        1. **프로젝트 선택**: 분석할 프로젝트 폴더 경로를 입력하세요
+        2. **분석 관점 선택**: 배포 관점 또는 개인 사용 관점을 선택하세요
+        3. **분석 시작**: '🚀 분석 시작' 버튼을 클릭하세요
+        
+        ### ✨ v1.10.0 새로운 기능
+        - 📍 **상단 네비게이션 바**: 메인, 분석 결과, 히스토리, 비교, 폴더 구조 간 빠른 이동
+        - 🏠 **홈으로 돌아가기**: 모든 화면에서 메인 페이지로 쉽게 복귀
+        - 🔄 **새 분석 시작**: 분석 결과 화면에서 바로 새로운 분석 시작
+        - 📂 **빠른 경로 선택**: 바탕화면, 문서 폴더 빠른 접근
+        - 📄 **결과 다운로드**: JSON/HTML/PDF 형식으로 저장
+        - 📈 **히스토리 뷰어**: 과거 분석 결과 및 추세 확인
+        - 🔄 **비교 모드**: 두 분석 결과 비교 및 개선/악화 추적
+        - 🌳 **폴더 트리 뷰어**: 프로젝트 구조 및 분석 대상 파일 확인
+        - 📊 **페이지네이션**: 대량 이슈도 편리하게 탐색 (10/20/50/100개씩)
+        - 🔍 **고급 필터링**: 심각도별 이슈 필터링
+        
+        ### 지원 언어
+        Python, JavaScript, TypeScript, Go, Rust, PHP, Ruby, Kotlin, Swift, C#, Java
+        
+        ### 분석 도구
+        - 정적 분석: Pylint, ESLint, staticcheck, clippy, PHPStan, RuboCop 등 15+ 도구
+        - AI 분석: Claude API 기반 코드 리뷰
+        """)
+        
 except Exception as e:
     # Streamlit Cloud에서 오류 발생 시 사용자에게 표시
     error_msg = f"Failed to start Streamlit app: {str(e)}\n{traceback.format_exc()}"
