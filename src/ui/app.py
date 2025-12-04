@@ -1356,10 +1356,18 @@ def main():
 # Streamlit은 파일을 import할 때 최상위 레벨 코드를 실행하므로
 # main()을 직접 호출합니다
 # Streamlit Cloud에서는 __name__이 "__main__"이 아닐 수 있으므로 항상 실행
+
+# 디버깅을 위해 로그 추가
+import traceback
 try:
+    logger.info("Starting Streamlit app...")
+    logger.info("__name__ = %s", __name__)
     main()
 except Exception as e:
     # Streamlit Cloud에서 오류 발생 시 사용자에게 표시
+    error_msg = f"Failed to start Streamlit app: {str(e)}\n{traceback.format_exc()}"
+    logger.error(error_msg)
     st.error(f"❌ 앱 시작 중 오류가 발생했습니다: {str(e)}")
     st.exception(e)
-    logger.error("Failed to start Streamlit app", exc_info=True)
+    # Streamlit Cloud 로그에 출력되도록 print도 사용
+    print(f"ERROR: {error_msg}")
