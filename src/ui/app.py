@@ -137,17 +137,32 @@ def render_sidebar() -> Dict[str, Any]:
 
         # Quick access to common locations
         with st.expander("📂 빠른 경로 선택", expanded=True):
-            import subprocess
-            import platform
-            import tkinter as tk
-            from tkinter import filedialog
-
-            desktop = str(Path.home() / "Desktop")
-            documents = str(Path.home() / "Documents")
-            home = str(Path.home())
-
+            # Streamlit Cloud에서는 GUI 대화상자를 사용할 수 없으므로
+            # 빠른 경로 버튼만 제공 (경로를 직접 입력하도록 안내)
+            try:
+                desktop = str(Path.home() / "Desktop")
+                documents = str(Path.home() / "Documents")
+                home = str(Path.home())
+            except (OSError, ValueError):
+                # 경로 접근 실패 시 기본값 사용
+                desktop = ""
+                documents = ""
+                home = ""
+            
+            # tkinter 사용 가능 여부 확인 (Streamlit Cloud에서는 사용 불가)
+            try:
+                import tkinter as tk  # noqa: F401
+                from tkinter import filedialog  # noqa: F401
+                HAS_TKINTER = True
+            except ImportError:
+                HAS_TKINTER = False
+            
             def select_folder_dialog(initial_dir=None):
                 """Open folder selection dialog and return selected path"""
+                if not HAS_TKINTER:
+                    # Streamlit Cloud에서는 파일 대화상자 사용 불가
+                    st.info("💡 Streamlit Cloud에서는 파일 대화상자를 사용할 수 없습니다. 경로를 직접 입력해주세요.")
+                    return None
                 try:
                     # Create a root window and hide it
                     root = tk.Tk()
@@ -168,40 +183,61 @@ def render_sidebar() -> Dict[str, Any]:
                     # 최상위에서 한 번만 잡고 사용자에게 오류 메시지를 보여줍니다.
                     st.error(f"폴더 선택 실패: {e}")
                     return None
+            
+            if HAS_TKINTER:
+                st.caption("📌 아래 버튼을 클릭하면 폴더 선택 창이 열립니다")
+            else:
+                st.caption("💡 경로를 직접 입력하거나 아래 버튼으로 빠른 경로를 설정하세요")
 
-            st.caption("📌 아래 버튼을 클릭하면 폴더 선택 창이 열립니다")
-
-            # Folder browser button (primary action)
-            if st.button("📁 폴더 선택", width='stretch', type="primary", key="btn_browse"):
-                selected_path = select_folder_dialog()
-                if selected_path:
-                    st.session_state.project_path = selected_path
-                    st.rerun()
-
-            st.divider()
-            st.caption("⚡ 또는 빠른 경로로 바로 이동:")
-
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🖥️ 바탕화면", width='stretch', key="btn_desktop"):
-                    selected_path = select_folder_dialog(desktop)
-                    if selected_path:
-                        st.session_state.project_path = selected_path
-                        st.rerun()
-            with col2:
-                if st.button("📁 문서", width='stretch', key="btn_documents"):
-                    selected_path = select_folder_dialog(documents)
+            if HAS_TKINTER:
+                st.caption("📌 아래 버튼을 클릭하면 폴더 선택 창이 열립니다")
+                
+                # Folder browser button (primary action)
+                if st.button("📁 폴더 선택", width='stretch', type="primary", key="btn_browse"):
+                    selected_path = select_folder_dialog()
                     if selected_path:
                         st.session_state.project_path = selected_path
                         st.rerun()
 
-            if st.button("🏠 홈 디렉토리", width='stretch', key="btn_home"):
-                selected_path = select_folder_dialog(home)
-                if selected_path:
-                    st.session_state.project_path = selected_path
-                    st.rerun()
+                st.divider()
+                st.caption("⚡ 또는 빠른 경로로 바로 이동:")
 
-            st.caption("💡 폴더 선택 창에서 원하는 프로젝트 폴더를 선택하면 자동으로 경로가 입력됩니다")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🖥️ 바탕화면", width='stretch', key="btn_desktop"):
+                        selected_path = select_folder_dialog(desktop)
+                        if selected_path:
+                            st.session_state.project_path = selected_path
+                            st.rerun()
+                with col2:
+                    if st.button("📁 문서", width='stretch', key="btn_documents"):
+                        selected_path = select_folder_dialog(documents)
+                        if selected_path:
+                            st.session_state.project_path = selected_path
+                            st.rerun()
+
+                if st.button("🏠 홈 디렉토리", width='stretch', key="btn_home"):
+                    selected_path = select_folder_dialog(home)
+                    if selected_path:
+                        st.session_state.project_path = selected_path
+                        st.rerun()
+
+                st.caption("💡 폴더 선택 창에서 원하는 프로젝트 폴더를 선택하면 자동으로 경로가 입력됩니다")
+            else:
+                # Streamlit Cloud에서는 파일 대화상자 사용 불가
+                st.info("💡 Streamlit Cloud에서는 파일 대화상자를 사용할 수 없습니다. 아래 텍스트 입력란에 경로를 직접 입력해주세요.")
+                if desktop:
+                    if st.button("🖥️ 바탕화면 경로 사용", width='stretch', key="btn_desktop"):
+                        st.session_state.project_path = desktop
+                        st.rerun()
+                if documents:
+                    if st.button("📁 문서 경로 사용", width='stretch', key="btn_documents"):
+                        st.session_state.project_path = documents
+                        st.rerun()
+                if home:
+                    if st.button("🏠 홈 디렉토리 경로 사용", width='stretch', key="btn_home"):
+                        st.session_state.project_path = home
+                        st.rerun()
 
         # Manual path input (uses session state directly as key)
         project_path = st.text_input(
