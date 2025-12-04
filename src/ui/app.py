@@ -15,7 +15,15 @@ import json
 from datetime import datetime
 
 # Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# Streamlit Cloud에서도 정상 작동하도록 상대 경로 사용
+try:
+    project_root = Path(__file__).parent.parent.parent
+    project_root_str = str(project_root)
+    if project_root_str not in sys.path:
+        sys.path.insert(0, project_root_str)
+except (OSError, ValueError):
+    # 경로 추가 실패 시 무시 (이미 경로가 설정되어 있을 수 있음)
+    pass
 
 from src.core.analyzer_engine import AnalyzerEngine, AnalysisProgress
 from src.config.settings import ANALYSIS_MODES

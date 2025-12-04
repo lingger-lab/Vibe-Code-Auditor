@@ -6,6 +6,8 @@ Generates PDF format analysis reports using ReportLab
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List
+import platform
+import os
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
@@ -38,18 +40,47 @@ class PDFReporter:
     def _register_korean_font(self) -> None:
         """
         Register a font that supports Korean characters.
-
-        On Windows, we try to use 'Malgun Gothic' which is installed by default.
+        
+        플랫폼별로 한글 폰트 경로를 시도합니다:
+        - Windows: Malgun Gothic (맑은 고딕)
+        - Linux/macOS: 시스템 기본 한글 폰트 또는 기본 폰트 사용
         """
-        try:
+        self.base_font_name = self.styles["Normal"].fontName  # 기본값 설정
+        
+        # 플랫폼별 폰트 경로 시도
+        font_paths = []
+        
+        if platform.system() == "Windows":
             # Windows 기본 한글 폰트 경로
-            malgun_path = r"C:\Windows\Fonts\malgun.ttf"
-            pdfmetrics.registerFont(TTFont("MalgunGothic", malgun_path))
-            self.base_font_name = "MalgunGothic"
-        except Exception:
-            # 폰트 등록에 실패하면 기본 폰트 사용 (한글은 깨져 보일 수 있음)
-            self.base_font_name = self.styles["Normal"].fontName
-
+            font_paths = [
+                r"C:\Windows\Fonts\malgun.ttf",
+                r"C:\Windows\Fonts\gulim.ttc",
+            ]
+        elif platform.system() == "Linux":
+            # Linux 시스템 폰트 경로 (Streamlit Cloud 등)
+            font_paths = [
+                "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            ]
+        elif platform.system() == "Darwin":  # macOS
+            font_paths = [
+                "/System/Library/Fonts/AppleGothic.ttf",
+                "/Library/Fonts/AppleGothic.ttf",
+            ]
+        
+        # 폰트 경로를 순차적으로 시도
+        for font_path in font_paths:
+            try:
+                if os.path.exists(font_path):
+                    font_name = "KoreanFont"
+                    pdfmetrics.registerFont(TTFont(font_name, font_path))
+                    self.base_font_name = font_name
+                    break
+            except (OSError, IOError, Exception):
+                # 폰트 등록 실패 시 다음 경로 시도
+                continue
+        
         # 기본 Normal 스타일에도 한글 폰트를 적용해, 별도 스타일을 쓰지 않는 본문도 깨지지 않게 함
         self.styles["Normal"].fontName = self.base_font_name
 

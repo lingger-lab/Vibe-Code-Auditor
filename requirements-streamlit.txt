@@ -1,0 +1,21 @@
+# Streamlit Cloud 배포용 requirements.txt
+# 빌드/테스트 도구는 제외하고 런타임 의존성만 포함
+
+# Core dependencies
+click==8.1.7
+anthropic==0.45.0
+rich==13.9.4
+python-dotenv==1.0.1
+pylint==3.3.2
+pyyaml==6.0.2
+# semgrep==1.100.0  # Windows 미지원 - WSL/Linux 환경에서만 설치 가능
+
+# UI dependencies
+streamlit==1.51.0
+plotly==6.5.0
+
+# PDF generation
+reportlab==4.2.5
+
+# Note: pyinstaller, pytest 등은 Streamlit Cloud에서 불필요하므로 제외
+
