@@ -35,15 +35,6 @@ from src.reporters.pdf_reporter import PDFReporter
 logger = setup_logger(__name__)
 
 
-# Page configuration
-st.set_page_config(
-    page_title="Vibe-Code Auditor",
-    page_icon="🔍",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-
 def init_session_state():
     """Initialize Streamlit session state variables."""
     if 'analysis_results' not in st.session_state:
@@ -1246,6 +1237,14 @@ def run_analysis(config: Dict[str, Any]):
 
 def main():
     """Main Streamlit application."""
+    # Page configuration (Streamlit의 첫 번째 명령이어야 함)
+    st.set_page_config(
+        page_title="Vibe-Code Auditor",
+        page_icon="🔍",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
     init_session_state()
     render_header()
     
@@ -1351,6 +1350,15 @@ def main():
         - AI 분석: Claude API 기반 코드 리뷰
         """)
 
-# Streamlit Cloud에서는 모듈로 import되므로 __name__ == "__main__" 체크 없이 실행
-# 로컬 개발 환경에서도 streamlit run으로 실행하므로 문제 없음
-main()
+# Streamlit 실행
+# Streamlit Cloud와 로컬 환경 모두에서 작동하도록 처리
+# Streamlit은 파일을 import할 때 최상위 레벨 코드를 실행하므로
+# main()을 직접 호출합니다
+if __name__ == "__main__" or True:  # Streamlit Cloud 호환성을 위해 항상 실행
+    try:
+        main()
+    except Exception as e:
+        # Streamlit Cloud에서 오류 발생 시 사용자에게 표시
+        st.error(f"❌ 앱 시작 중 오류가 발생했습니다: {str(e)}")
+        st.exception(e)
+        logger.error("Failed to start Streamlit app", exc_info=True)
