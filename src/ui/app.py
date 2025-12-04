@@ -25,14 +25,29 @@ except (OSError, ValueError):
     # 경로 추가 실패 시 무시 (이미 경로가 설정되어 있을 수 있음)
     pass
 
-from src.core.analyzer_engine import AnalyzerEngine, AnalysisProgress
-from src.config.settings import ANALYSIS_MODES
-from src.utils.logger import setup_logger
-from src.reporters.json_reporter import JSONReporter
-from src.reporters.html_reporter import HTMLReporter
-from src.reporters.pdf_reporter import PDFReporter
-
-logger = setup_logger(__name__)
+# Import with error handling for Streamlit Cloud
+try:
+    from src.core.analyzer_engine import AnalyzerEngine, AnalysisProgress
+    from src.config.settings import ANALYSIS_MODES
+    from src.utils.logger import setup_logger
+    from src.reporters.json_reporter import JSONReporter
+    from src.reporters.html_reporter import HTMLReporter
+    from src.reporters.pdf_reporter import PDFReporter
+    
+    logger = setup_logger(__name__)
+    logger.info("All imports successful")
+except ImportError as e:
+    # Import 오류 발생 시 Streamlit에 표시
+    import sys
+    print(f"IMPORT ERROR: {e}", file=sys.stderr)
+    st.error(f"❌ 모듈 import 오류: {str(e)}")
+    st.stop()
+except Exception as e:
+    # 기타 오류
+    import sys
+    print(f"INIT ERROR: {e}", file=sys.stderr)
+    st.error(f"❌ 초기화 오류: {str(e)}")
+    st.stop()
 
 # Page configuration (반드시 최상위 레벨에서 호출되어야 함)
 # Streamlit의 첫 번째 명령이어야 하며, 다른 Streamlit 명령보다 먼저 실행되어야 합니다
