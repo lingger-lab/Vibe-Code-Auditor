@@ -48,16 +48,19 @@ class PDFReporter:
         self.base_font_name = self.styles["Normal"].fontName  # 기본값 설정
         
         # 플랫폼별 폰트 경로 시도
+        # Streamlit Cloud에서는 시스템 폰트가 없을 수 있으므로 안전하게 처리
         font_paths = []
         
         if platform.system() == "Windows":
             # Windows 기본 한글 폰트 경로
+            # 절대 경로이지만 시스템 폰트 경로이므로 허용
             font_paths = [
                 r"C:\Windows\Fonts\malgun.ttf",
                 r"C:\Windows\Fonts\gulim.ttc",
             ]
         elif platform.system() == "Linux":
             # Linux 시스템 폰트 경로 (Streamlit Cloud 등)
+            # Streamlit Cloud는 Linux 환경이지만 폰트가 없을 수 있음
             font_paths = [
                 "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -70,13 +73,28 @@ class PDFReporter:
             ]
         
         # 폰트 경로를 순차적으로 시도
+        # Streamlit Cloud에서는 폰트가 없을 수 있으므로 예외 처리
+        font_registered = False
         for font_path in font_paths:
             try:
                 if os.path.exists(font_path):
                     font_name = "KoreanFont"
                     pdfmetrics.registerFont(TTFont(font_name, font_path))
                     self.base_font_name = font_name
+                    font_registered = True
+                    logger.info("Korean font registered: %s", font_path)
                     break
+            except (OSError, IOError) as e:
+                # 폰트 파일 읽기 실패 시 다음 경로 시도
+                logger.debug("Failed to register font %s: %s", font_path, e)
+                continue
+        
+        # 폰트 등록 실패 시 경고 로그만 출력하고 기본 폰트 사용
+        if not font_registered:
+            logger.warning(
+                "Korean font not found. Korean characters may not render correctly. "
+                "Available font paths were checked: %s", font_paths
+            )
             except (OSError, IOError, Exception):
                 # 폰트 등록 실패 시 다음 경로 시도
                 continue

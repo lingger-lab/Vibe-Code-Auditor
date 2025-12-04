@@ -7,6 +7,15 @@ to perform code analysis through a simple 3-click workflow:
 3. View results
 """
 
+"""
+Streamlit UI for Vibe-Code Auditor.
+
+이 모듈은 Streamlit Cloud에서도 안정적으로 작동하도록 최적화되었습니다.
+- 최상위 레벨 import 최소화
+- 무거운 모듈은 함수 내부에서 lazy import
+- 각 초기화 단계별 예외 처리
+"""
+
 import streamlit as st
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -14,67 +23,83 @@ import sys
 import json
 from datetime import datetime
 
-# Add parent directory to path for imports
+# Step 1: 프로젝트 루트 경로 설정 (최소한의 초기화)
 # Streamlit Cloud에서도 정상 작동하도록 상대 경로 사용
 try:
     project_root = Path(__file__).parent.parent.parent
     project_root_str = str(project_root)
     if project_root_str not in sys.path:
         sys.path.insert(0, project_root_str)
-except (OSError, ValueError):
-    # 경로 추가 실패 시 무시 (이미 경로가 설정되어 있을 수 있음)
-    pass
+    print(f"STEP 1: Project root added to path: {project_root_str}", file=sys.stderr)
+except (OSError, ValueError) as e:
+    # 경로 추가 실패 시 경고만 출력하고 계속 진행
+    print(f"STEP 1 WARNING: Failed to add project root to path: {e}", file=sys.stderr)
 
-# Import with error handling for Streamlit Cloud
+# Step 2: 기본 logger만 최상위 레벨에서 import (가벼운 모듈)
+# 무거운 모듈(AnalyzerEngine, PDFReporter 등)은 함수 내부에서 lazy import
 try:
-    from src.core.analyzer_engine import AnalyzerEngine, AnalysisProgress
-    from src.config.settings import ANALYSIS_MODES
     from src.utils.logger import setup_logger
-    from src.reporters.json_reporter import JSONReporter
-    from src.reporters.html_reporter import HTMLReporter
-    from src.reporters.pdf_reporter import PDFReporter
-    
     logger = setup_logger(__name__)
-    logger.info("All imports successful")
+    logger.info("STEP 2: Logger initialized successfully")
+    print("STEP 2: Logger initialized", file=sys.stderr)
 except ImportError as e:
-    # Import 오류 발생 시 Streamlit에 표시
-    import sys
-    print(f"IMPORT ERROR: {e}", file=sys.stderr)
-    st.error(f"❌ 모듈 import 오류: {str(e)}")
+    # Logger import 실패는 치명적이므로 중단
+    print(f"STEP 2 ERROR: Failed to import logger: {e}", file=sys.stderr)
+    st.error(f"❌ 로거 초기화 실패: {str(e)}")
     st.stop()
 except Exception as e:
     # 기타 오류
-    import sys
-    print(f"INIT ERROR: {e}", file=sys.stderr)
-    st.error(f"❌ 초기화 오류: {str(e)}")
+    print(f"STEP 2 ERROR: Logger initialization failed: {e}", file=sys.stderr)
+    st.error(f"❌ 로거 초기화 오류: {str(e)}")
     st.stop()
 
-# Page configuration (반드시 최상위 레벨에서 호출되어야 함)
+# Step 3: Page configuration (반드시 최상위 레벨에서 호출되어야 함)
 # Streamlit의 첫 번째 명령이어야 하며, 다른 Streamlit 명령보다 먼저 실행되어야 합니다
-st.set_page_config(
-    page_title="Vibe-Code Auditor",
-    page_icon="🔍",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+try:
+    st.set_page_config(
+        page_title="Vibe-Code Auditor",
+        page_icon="🔍",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    print("STEP 3: Page config set", file=sys.stderr)
+except Exception as e:
+    # Page config 실패는 치명적이므로 중단
+    print(f"STEP 3 ERROR: Failed to set page config: {e}", file=sys.stderr)
+    st.error(f"❌ 페이지 설정 실패: {str(e)}")
+    st.stop()
 
 
 def init_session_state():
-    """Initialize Streamlit session state variables."""
-    if 'analysis_results' not in st.session_state:
-        st.session_state.analysis_results = None
-    if 'analysis_running' not in st.session_state:
-        st.session_state.analysis_running = False
-    if 'progress' not in st.session_state:
-        st.session_state.progress = AnalysisProgress()
-    if 'page_number' not in st.session_state:
-        st.session_state.page_number = 0
-    if 'items_per_page' not in st.session_state:
-        st.session_state.items_per_page = 20
-    if 'current_view' not in st.session_state:
-        st.session_state.current_view = 'main'
-    if 'project_path' not in st.session_state:
-        st.session_state.project_path = ""
+    """
+    Initialize Streamlit session state variables.
+    
+    Streamlit Cloud에서 안정적으로 작동하도록 단계별 예외 처리.
+    """
+    try:
+        # Step 4: Session state 초기화
+        if 'analysis_results' not in st.session_state:
+            st.session_state.analysis_results = None
+        if 'analysis_running' not in st.session_state:
+            st.session_state.analysis_running = False
+        if 'progress' not in st.session_state:
+            # AnalysisProgress는 lazy import로 처리
+            from src.core.analyzer_engine import AnalysisProgress
+            st.session_state.progress = AnalysisProgress()
+        if 'page_number' not in st.session_state:
+            st.session_state.page_number = 0
+        if 'items_per_page' not in st.session_state:
+            st.session_state.items_per_page = 20
+        if 'current_view' not in st.session_state:
+            st.session_state.current_view = 'main'
+        if 'project_path' not in st.session_state:
+            st.session_state.project_path = ""
+        print("STEP 4: Session state initialized", file=sys.stderr)
+    except Exception as e:
+        # Session state 초기화 실패는 치명적이므로 중단
+        print(f"STEP 4 ERROR: Failed to initialize session state: {e}", file=sys.stderr)
+        st.error(f"❌ 세션 상태 초기화 실패: {str(e)}")
+        st.stop()
 
 
 def render_header():
@@ -273,8 +298,14 @@ def render_sidebar() -> Dict[str, Any]:
             help="배포 관점: 보안, 성능, 확장성 중심 | 개인 관점: 가독성, 유지보수성 중심"
         )
 
-        mode_info = ANALYSIS_MODES[mode]
-        st.info(f"**우선순위**: {', '.join(mode_info['priorities'])}")
+        # Lazy import for ANALYSIS_MODES
+        try:
+            from src.config.settings import ANALYSIS_MODES
+            mode_info = ANALYSIS_MODES[mode]
+            st.info(f"**우선순위**: {', '.join(mode_info['priorities'])}")
+        except ImportError as e:
+            logger.error("Failed to import ANALYSIS_MODES: %s", e)
+            st.warning("분석 모드 정보를 불러올 수 없습니다.")
 
         st.divider()
 
@@ -413,6 +444,8 @@ def render_download_buttons(results: Dict[str, Any], project_path: Path, mode: s
     with col2:
         # HTML download
         try:
+            # Lazy import for HTMLReporter
+            from src.reporters.html_reporter import HTMLReporter
             html_reporter = HTMLReporter(mode)
 
             # Generate HTML in memory
@@ -444,6 +477,8 @@ def render_download_buttons(results: Dict[str, Any], project_path: Path, mode: s
     with col3:
         # PDF download
         try:
+            # Lazy import for PDFReporter
+            from src.reporters.pdf_reporter import PDFReporter
             pdf_reporter = PDFReporter(mode)
 
             # Generate PDF directly to memory (BytesIO)
@@ -547,6 +582,8 @@ def render_history_viewer(project_path: Path):
     st.header("📈 분석 히스토리")
 
     try:
+        # Lazy import for AnalyzerEngine
+        from src.core.analyzer_engine import AnalyzerEngine
         engine = AnalyzerEngine(project_path)
         trend_data = engine.get_trend_data()
 
@@ -642,6 +679,8 @@ def render_comparison_mode(project_path: Path):
     st.header("🔄 분석 결과 비교")
 
     try:
+        # Lazy import for AnalyzerEngine
+        from src.core.analyzer_engine import AnalyzerEngine
         engine = AnalyzerEngine(project_path)
         trend_data = engine.get_trend_data()
         timeline = trend_data.get('timeline', [])
@@ -1271,6 +1310,9 @@ def run_analysis(config: Dict[str, Any]):
 
     try:
         # Create analyzer engine
+        print(f"STEP: Creating AnalyzerEngine for {config['project_path']}", file=sys.stderr)
+        logger.info("Creating AnalyzerEngine for %s", config['project_path'])
+        
         engine = AnalyzerEngine(
             project_path=Path(config['project_path']),
             mode=config['mode'],
@@ -1281,12 +1323,23 @@ def run_analysis(config: Dict[str, Any]):
         )
 
         # Run analysis
+        print("STEP: Starting analysis...", file=sys.stderr)
+        logger.info("Starting analysis...")
         results = engine.analyze()
+        print("STEP: Analysis completed successfully", file=sys.stderr)
+        logger.info("Analysis completed successfully")
 
         # Store results
         st.session_state.analysis_results = results
+        print("STEP: Results stored in session state", file=sys.stderr)
+        logger.info("Results stored in session state")
 
     except Exception as e:
+        # 상세한 오류 정보를 stderr와 logger에 출력
+        import traceback
+        error_msg = f"ERROR: Analysis failed: {e}\n{traceback.format_exc()}"
+        print(error_msg, file=sys.stderr)
+        logger.error("Analysis failed: %s", e, exc_info=True)
         logger.error(f"Analysis failed: {e}", exc_info=True)
         st.session_state.progress.error = str(e)
         st.session_state.progress.completed = True
@@ -1438,18 +1491,31 @@ try:
     
     # Main content area
     if config['start_button']:
+        print("STEP 10: Start button clicked, validating project path", file=sys.stderr)
+        logger.info("Start button clicked, validating project path")
+        
         # Validate project path
         project_path = Path(config['project_path'])
         if not project_path.exists():
-            st.error(f"❌ 프로젝트 경로가 존재하지 않습니다: {config['project_path']}")
+            error_msg = f"❌ 프로젝트 경로가 존재하지 않습니다: {config['project_path']}"
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            logger.error("Project path does not exist: %s", config['project_path'])
+            st.error(error_msg)
         elif not project_path.is_dir():
-            st.error(f"❌ 유효한 디렉토리가 아닙니다: {config['project_path']}")
+            error_msg = f"❌ 유효한 디렉토리가 아닙니다: {config['project_path']}"
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            logger.error("Project path is not a directory: %s", config['project_path'])
+            st.error(error_msg)
         else:
             # Run analysis
+            print("STEP 11: Starting analysis", file=sys.stderr)
+            logger.info("Starting analysis for project: %s", config['project_path'])
             with st.spinner('분석 중...'):
                 run_analysis(config)
             
             # Set view to results and trigger rerun
+            print("STEP 12: Analysis completed, switching to results view", file=sys.stderr)
+            logger.info("Analysis completed, switching to results view")
             st.session_state.current_view = 'results'
             st.rerun()
     
