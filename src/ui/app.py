@@ -1351,6 +1351,6 @@ def main():
         - AI 분석: Claude API 기반 코드 리뷰
         """)
 
-
-if __name__ == "__main__":
-    main()
+# Streamlit Cloud에서는 모듈로 import되므로 __name__ == "__main__" 체크 없이 실행
+# 로컬 개발 환경에서도 streamlit run으로 실행하므로 문제 없음
+main()
