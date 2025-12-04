@@ -34,6 +34,15 @@ from src.reporters.pdf_reporter import PDFReporter
 
 logger = setup_logger(__name__)
 
+# Page configuration (반드시 최상위 레벨에서 호출되어야 함)
+# Streamlit의 첫 번째 명령이어야 하며, 다른 Streamlit 명령보다 먼저 실행되어야 합니다
+st.set_page_config(
+    page_title="Vibe-Code Auditor",
+    page_icon="🔍",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 
 def init_session_state():
     """Initialize Streamlit session state variables."""
@@ -1237,14 +1246,6 @@ def run_analysis(config: Dict[str, Any]):
 
 def main():
     """Main Streamlit application."""
-    # Page configuration (Streamlit의 첫 번째 명령이어야 함)
-    st.set_page_config(
-        page_title="Vibe-Code Auditor",
-        page_icon="🔍",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
-    
     init_session_state()
     render_header()
     
