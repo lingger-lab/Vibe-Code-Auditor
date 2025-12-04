@@ -1355,11 +1355,11 @@ def main():
 # Streamlit Cloud와 로컬 환경 모두에서 작동하도록 처리
 # Streamlit은 파일을 import할 때 최상위 레벨 코드를 실행하므로
 # main()을 직접 호출합니다
-if __name__ == "__main__" or True:  # Streamlit Cloud 호환성을 위해 항상 실행
-    try:
-        main()
-    except Exception as e:
-        # Streamlit Cloud에서 오류 발생 시 사용자에게 표시
-        st.error(f"❌ 앱 시작 중 오류가 발생했습니다: {str(e)}")
-        st.exception(e)
-        logger.error("Failed to start Streamlit app", exc_info=True)
+# Streamlit Cloud에서는 __name__이 "__main__"이 아닐 수 있으므로 항상 실행
+try:
+    main()
+except Exception as e:
+    # Streamlit Cloud에서 오류 발생 시 사용자에게 표시
+    st.error(f"❌ 앱 시작 중 오류가 발생했습니다: {str(e)}")
+    st.exception(e)
+    logger.error("Failed to start Streamlit app", exc_info=True)
